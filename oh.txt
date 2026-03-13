@@ -14,6 +14,39 @@ local VERBOSUS_WAIT = 13
 local VERBOSUS_NAME = "Verbosus, Ruler of Space"
 local MINE_FOLDERS  = {Mine1="Mine", Mine2="Mine2", Mine3="Mine3"}
 
+-- CRAFT WHITELIST: item names that will be AUTO-SELECTED in the craft tab
+local CRAFT_WHITELIST = {
+    -- Ores
+    ["Divumite"]=true,["Divumite2"]=true,["Divumite3"]=true,
+    ["Rolite"]=true,["Rolite2"]=true,["Rolite3"]=true,
+    ["Dankite"]=true,["Dankite2"]=true,["Dankite3"]=true,
+    ["Regite"]=true,["Regite2"]=true,["Regite3"]=true,
+    ["Amberstone"]=true,["Amberstone2"]=true,["Amberstone3"]=true,
+    ["Optimum"]=true,["Optimum2"]=true,["Optimum3"]=true,
+    ["Ultimus"]=true,["Ultimus2"]=true,["Ultimus3"]=true,
+    ["Vermite"]=true,["Vermite2"]=true,["Vermite3"]=true,
+    ["Plutonium"]=true,["Plutonium2"]=true,["Plutonium3"]=true,
+    ["Uranium"]=true,["Uranium2"]=true,["Uranium3"]=true,
+    -- Chaos Shards
+    ["ChaosShard1"]=true,["ChaosShard2"]=true,["ChaosShard3"]=true,
+    ["ChaosShard4"]=true,["ChaosShard5"]=true,["ChaosShard6"]=true,
+    ["ChaosShard7"]=true,["ChaosShard8"]=true,["ChaosShard9"]=true,
+    -- Materials
+    ["RulerGem"]=true,
+    ["ShardoftheUniverse"]=true,
+    ["DarknessGem"]=true,
+    -- Rare Items
+    ["CoinGun"]=true,
+    ["SanctusExcal"]=true,
+    ["rosshammer"]=true,
+    ["ScepterOfTime"]=true,
+    ["CosmicSea"]=true,
+    ["RealityBender"]=true,
+    ["zephyrplush"]=true,
+    ["suplush"]=true,
+    ["moefuplush"]=true,
+}
+
 local BIOME_LIST = {
     {id=0,name="Default",rank=1},{id=1,name="Biome 1",rank=100},
     {id=2,name="Biome 2",rank=75},{id=3,name="Biome 3",rank=75},
@@ -743,13 +776,6 @@ local function doSummon()
     BiomeActiveLbl.Text="▶ "..selectedBiome.name
 end
 
-local function onBiomeSelected()
-    if not biomeEnabled then return end
-    BiomeStatusLbl.Text="🔄 Switching..." BiomeStatusLbl.TextColor3=C_GOLD
-    task.wait(0.3)
-    doSummon()
-end
-
 local function getMobFolders()
     local folders = {}
     for _, child in ipairs(workspace:GetChildren()) do
@@ -777,8 +803,8 @@ local function startBiomeLoop()
             local current = getMobFolders()
             if current ~= "" and expectedMobKey ~= nil and current ~= expectedMobKey then
                 doSummon()
-                task.wait(4) -- wait for our biome to fully load
-                expectedMobKey = getMobFolders() -- record new expected
+                task.wait(4)
+                expectedMobKey = getMobFolders()
             end
         end
         biomeLooping=false
@@ -845,6 +871,12 @@ local _N="1=SparkleFedora,2=AlmightyFireScythe,3=EnchantedIron,4=BlackIron,5=Bla
 local ITEM_NAMES={}
 for k,v in _N:gmatch("(%d+)=([^,]+)") do ITEM_NAMES[tonumber(k)]=v end
 
+-- Build reverse lookup: name -> id
+local ITEM_IDS = {}
+for id, name in pairs(ITEM_NAMES) do
+    ITEM_IDS[name] = id
+end
+
 local function getItemName(itemid)
     return ITEM_NAMES[itemid] or ("Item #"..itemid)
 end
@@ -860,22 +892,42 @@ craftStatusLbl.Size=UDim2.new(1,0,0,16) craftStatusLbl.Font=Enum.Font.Gotham
 local craftCountLbl = lbl(craftStatusCard,"Crafted: 0  |  Selected: 0",9,Color3.fromRGB(80,80,105),0,22,1,0,Enum.TextXAlignment.Center)
 craftCountLbl.Size=UDim2.new(1,0,0,14) craftCountLbl.Font=Enum.Font.Gotham
 
-local searchBox = Instance.new("TextBox")
-searchBox.Size=UDim2.new(1,-20,0,26) searchBox.Position=UDim2.new(0,10,0,48)
-searchBox.BackgroundColor3=Color3.fromRGB(20,20,30) searchBox.BorderSizePixel=0
-searchBox.PlaceholderText="🔍  Search items..." searchBox.Text=""
-searchBox.TextColor3=Color3.fromRGB(210,210,225) searchBox.PlaceholderColor3=Color3.fromRGB(70,70,90)
-searchBox.TextSize=11 searchBox.Font=Enum.Font.Gotham searchBox.ClearTextOnFocus=false
-searchBox.Parent=ContentCraft
-Instance.new("UICorner",searchBox).CornerRadius=UDim.new(0,6)
-Instance.new("UIStroke",searchBox).Color=Color3.fromRGB(50,50,70)
-local searchPad=Instance.new("UIPadding",searchBox)
-searchPad.PaddingLeft=UDim.new(0,8)
+local stockBtn,stockStroke=makeBtn(ContentCraft,nil,"★ Select In Stock",Color3.fromRGB(60,200,80),Color3.fromRGB(10,30,12))
+stockBtn.Size=UDim2.new(0.48,-12,0,22) stockBtn.Position=UDim2.new(0,10,0,48)
+stockBtn.TextSize=10 stockStroke.Color=Color3.fromRGB(40,140,55)
+local clearBtn,clearStroke=makeBtn(ContentCraft,nil,"✕ Clear All",Color3.fromRGB(180,60,60),Color3.fromRGB(30,10,10))
+clearBtn.Size=UDim2.new(0.52,-8,0,22) clearBtn.Position=UDim2.new(0.48,2,0,48)
+clearBtn.TextSize=10 clearStroke.Color=Color3.fromRGB(120,40,40)
 
-local CRAFT_ROW=28 local CRAFT_SHOW=9
+local merchantStock = {}
+
+local function updateSelectedCount()
+    local n=0 for _ in pairs(craftSelected) do n+=1 end
+    craftCountLbl.Text="Crafted: "..craftCount.."  |  Selected: "..n
+end
+
+local craftRows = {}
+local craftQty = {}
+local allItems = {}
+do
+    for id, name in pairs(ITEM_NAMES) do
+        table.insert(allItems, {itemid=id, name=name})
+    end
+    table.sort(allItems, function(a,b) return a.name:lower() < b.name:lower() end)
+end
+local filteredItems = allItems
+
+local function getRowBg(isSelected, inStock)
+    if isSelected and inStock then return Color3.fromRGB(30,55,15)
+    elseif isSelected then return Color3.fromRGB(55,30,8)
+    elseif inStock then return Color3.fromRGB(16,28,16)
+    else return Color3.fromRGB(14,14,20) end
+end
+
+local CRAFT_ROW=28 local CRAFT_SHOW=8
 local listFrame = Instance.new("Frame")
 listFrame.Size=UDim2.new(1,-20,0,CRAFT_SHOW*CRAFT_ROW)
-listFrame.Position=UDim2.new(0,10,0,80)
+listFrame.Position=UDim2.new(0,10,0,106)
 listFrame.BackgroundColor3=Color3.fromRGB(14,14,20)
 listFrame.BorderSizePixel=0 listFrame.Parent=ContentCraft
 Instance.new("UICorner",listFrame).CornerRadius=UDim.new(0,8)
@@ -888,42 +940,67 @@ listSF.ScrollBarImageColor3=C_ORANGE
 listSF.ScrollingDirection=Enum.ScrollingDirection.Y
 listSF.Parent=listFrame
 
-local craftRows = {}
-local merchantStock = {}
-local craftQty = {}
-local allItems = {}
-do
-    for id, name in pairs(ITEM_NAMES) do
-        table.insert(allItems, {itemid=id, name=name})
-    end
-    table.sort(allItems, function(a,b) return a.name:lower() < b.name:lower() end)
-end
-local filteredItems = allItems  -- current filtered view
-
-local function updateSelectedCount()
-    local n=0 for _ in pairs(craftSelected) do n+=1 end
-    craftCountLbl.Text="Crafted: "..craftCount.."  |  Selected: "..n
-end
-
-local function getRowBg(isSelected, inStock)
-    if isSelected and inStock then return Color3.fromRGB(30,55,15)
-    elseif isSelected then return Color3.fromRGB(55,30,8)
-    elseif inStock then return Color3.fromRGB(16,28,16)
-    else return Color3.fromRGB(14,14,20) end
-end
+local searchBox = Instance.new("TextBox")
+searchBox.Size=UDim2.new(1,-20,0,26) searchBox.Position=UDim2.new(0,10,0,74)
+searchBox.BackgroundColor3=Color3.fromRGB(20,20,30) searchBox.BorderSizePixel=0
+searchBox.PlaceholderText="🔍  Search items..." searchBox.Text=""
+searchBox.TextColor3=Color3.fromRGB(210,210,225) searchBox.PlaceholderColor3=Color3.fromRGB(70,70,90)
+searchBox.TextSize=11 searchBox.Font=Enum.Font.Gotham searchBox.ClearTextOnFocus=false
+searchBox.Parent=ContentCraft
+Instance.new("UICorner",searchBox).CornerRadius=UDim.new(0,6)
+Instance.new("UIStroke",searchBox).Color=Color3.fromRGB(50,50,70)
+local searchPad=Instance.new("UIPadding",searchBox)
+searchPad.PaddingLeft=UDim.new(0,8)
 
 local function rebuildCraftList()
     for _,r in ipairs(craftRows) do r:Destroy() end
     craftRows={}
-    listSF.CanvasSize=UDim2.new(0,0,0,#filteredItems*CRAFT_ROW)
-    for i,item in ipairs(filteredItems) do
+
+    local displayItems = {}
+    local inStockIds = {}
+    for itemid,_ in pairs(merchantStock) do inStockIds[itemid]=true end
+
+    local merchantFirst = {}
+    for _,item in ipairs(filteredItems) do
+        if inStockIds[item.itemid] then table.insert(merchantFirst, item) end
+    end
+    table.sort(merchantFirst, function(a,b)
+        local sa=merchantStock[a.itemid] local sb=merchantStock[b.itemid]
+        return (sa and sa.cost or 0) > (sb and sb.cost or 0)
+    end)
+    for _,item in ipairs(merchantFirst) do table.insert(displayItems, item) end
+
+    local sepIdx = #merchantFirst > 0 and #merchantFirst or nil
+
+    for _,item in ipairs(filteredItems) do
+        if not inStockIds[item.itemid] then table.insert(displayItems, item) end
+    end
+    local totalRows = #displayItems + (sepIdx and 1 or 0)
+    listSF.CanvasSize=UDim2.new(0,0,0,totalRows*CRAFT_ROW)
+    local rowOffset = 0
+
+    if sepIdx then
+        local sep=Instance.new("Frame")
+        sep.Size=UDim2.new(1,0,0,CRAFT_ROW-1)
+        sep.Position=UDim2.new(0,0,0,sepIdx*CRAFT_ROW)
+        sep.BackgroundColor3=Color3.fromRGB(30,40,30)
+        sep.BorderSizePixel=0 sep.ZIndex=2 sep.Parent=listSF
+        local sepLbl=Instance.new("TextLabel",sep)
+        sepLbl.Size=UDim2.new(1,0,1,0) sepLbl.BackgroundTransparency=1
+        sepLbl.Text="--all items--" sepLbl.TextColor3=Color3.fromRGB(80,120,80)
+        sepLbl.Font=Enum.Font.Gotham sepLbl.TextSize=10 sepLbl.ZIndex=3
+        table.insert(craftRows, sep)
+        rowOffset = 1
+    end
+    for i,item in ipairs(displayItems) do
         local inStock = merchantStock[item.itemid]
         local isSelected = craftSelected[item.itemid]
+        local rowPos = i <= (sepIdx or 0) and (i-1) or (i-1+rowOffset)
         local qty = craftQty[item.itemid] or 1
 
         local row=Instance.new("Frame")
         row.Size=UDim2.new(1,0,0,CRAFT_ROW-1)
-        row.Position=UDim2.new(0,0,0,(i-1)*CRAFT_ROW)
+        row.Position=UDim2.new(0,0,0,rowPos*CRAFT_ROW)
         row.BorderSizePixel=0 row.ZIndex=2
         row.BackgroundColor3=getRowBg(isSelected,inStock)
         row.Parent=listSF
@@ -939,9 +1016,20 @@ local function rebuildCraftList()
         chk.TextColor3=C_ORANGE chk.TextSize=13 chk.Font=Enum.Font.GothamBold
         chk.TextXAlignment=Enum.TextXAlignment.Center chk.ZIndex=4 chk.Parent=row
 
+        local displayName=item.name
+        if inStock then
+            local cost=inStock.cost or 0
+            local costStr
+            if cost>=1000000000000 then costStr=string.format("%.0fT",cost/1000000000000)
+            elseif cost>=1000000000 then costStr=string.format("%.0fB",cost/1000000000)
+            elseif cost>=1000000 then costStr=string.format("%.0fM",cost/1000000)
+            else costStr=tostring(cost) end
+            displayName=string.format("[%s] %s",costStr,item.name)
+        end
+
         local nl=Instance.new("TextLabel")
         nl.Size=UDim2.new(1,-90,1,0) nl.Position=UDim2.new(0,22,0,0)
-        nl.BackgroundTransparency=1 nl.Text=item.name
+        nl.BackgroundTransparency=1 nl.Text=displayName
         if isSelected then nl.TextColor3=C_ORANGE
         elseif inStock then nl.TextColor3=C_GREEN
         else nl.TextColor3=Color3.fromRGB(160,160,175) end
@@ -1004,6 +1092,15 @@ local function rebuildCraftList()
     end
 end
 
+stockBtn.MouseButton1Click:Connect(function()
+    craftSelected={}
+    for itemid,_ in pairs(merchantStock) do craftSelected[itemid]=true end
+    rebuildCraftList() updateSelectedCount()
+end)
+clearBtn.MouseButton1Click:Connect(function()
+    craftSelected={} rebuildCraftList() updateSelectedCount()
+end)
+
 local function applySearch(query)
     query=query:lower():gsub("%s+","")
     if query=="" then
@@ -1024,30 +1121,34 @@ searchBox:GetPropertyChangedSignal("Text"):Connect(function()
 end)
 
 rebuildCraftList()
-local craftInfoLbl = lbl(ContentCraft,"",10,Color3.fromRGB(80,80,100),10,62,1,-20,Enum.TextXAlignment.Left)
-craftInfoLbl.Size=UDim2.new(0,0,0,0) -- hidden, kept for compat
 
 local function parseMerchantItems(raw)
     if not raw or raw=="" or raw=="[]" then return {} end
     local items={}
-    for block in raw:gmatch("{([^{}]+)}") do
-        local itemid=tonumber(block:match('"itemid":(%d+)'))
-        local cost=tonumber(block:match('"cost":(%d+)'))
-        local stock=tonumber(block:match('"stock":(%d+)'))
-        local qty=tonumber(block:match('"quantity":(%d+)'))
-        if itemid and stock and stock>0 then
-            local ingredients={}
-            for ingid,ingqty in block:gmatch('"itemid":(%d+),"quantity":(%d+)') do
-                local id=tonumber(ingid)
-                if id~=itemid then
-                    table.insert(ingredients,{itemid=id,quantity=tonumber(ingqty)})
+    local depth=0
+    local start=nil
+    for i=1,#raw do
+        local c=raw:sub(i,i)
+        if c=="{" then
+            depth=depth+1
+            if depth==1 then start=i end
+        elseif c=="}" then
+            if depth==1 and start then
+                local block=raw:sub(start+1,i-1)
+                local itemid=tonumber(block:match('"itemid":(%d+)'))
+                local stock=tonumber(block:match('"stock":(%d+)'))
+                local cost=tonumber(block:match('"cost":(%d+)'))
+                local qty=tonumber(block:match('"quantity":(%d+)'))
+                if itemid and stock and stock>0 then
+                    table.insert(items,{
+                        itemid=itemid, name=getItemName(itemid),
+                        cost=cost or 0, stock=stock, qty=qty or 1,
+                        ingredients={}
+                    })
                 end
+                start=nil
             end
-            table.insert(items,{
-                itemid=itemid, name=getItemName(itemid),
-                cost=cost or 0, stock=stock, qty=qty or 1,
-                ingredients=ingredients
-            })
+            depth=depth-1
         end
     end
     return items
@@ -1060,10 +1161,23 @@ local function loadMerchantItems()
     for _,item in ipairs(merchantItems) do
         merchantStock[item.itemid]={stock=item.stock,cost=item.cost,ingredients=item.ingredients,qty=item.qty}
     end
+
+    -- AUTO SELECT whitelisted items that are in stock
+    craftSelected = {}
+    for _, item in ipairs(merchantItems) do
+        if CRAFT_WHITELIST[item.name] then
+            craftSelected[item.itemid] = true
+        end
+    end
+
     rebuildCraftList()
+    updateSelectedCount()
+
     if #merchantItems>0 then
-        craftStatusLbl.Text="🛒 Merchant: "..#merchantItems.." items available!"
-        craftStatusLbl.TextColor3=C_GREEN
+        local whitelistCount = 0
+        for _ in pairs(craftSelected) do whitelistCount += 1 end
+        craftStatusLbl.Text="🛒 Merchant: "..(#merchantItems).." items | ✅ "..whitelistCount.." matched"
+        craftStatusLbl.TextColor3 = whitelistCount > 0 and C_GREEN or C_GOLD
     else
         craftStatusLbl.Text="🛒 Waiting for merchant..."
         craftStatusLbl.TextColor3=Color3.fromRGB(120,120,145)
@@ -1074,40 +1188,42 @@ if MerchantItems and MerchantItems.Value~="" and MerchantItems.Value~="[]" then
     loadMerchantItems()
 end
 
-local CraftBtn,CraftStroke=makeBtn(ContentCraft,nil,"▶  START AUTO CRAFT",C_ORANGE,Color3.fromRGB(55,25,5))
+local CraftBtn,CraftStroke=makeBtn(ContentCraft,nil,"▶ START CRAFT",C_ORANGE,Color3.fromRGB(55,25,5))
 CraftBtn.Position=UDim2.new(0,10,1,-44)
 CraftStroke.Color=C_ORANGE
 
+-- FIXED: Use the correct invoke format discovered from source (just the item ID)
 local function tryBuyItem(item)
     if not MerchantRequest then
         craftStatusLbl.Text="❌ MerchantRequest not found!" craftStatusLbl.TextColor3=C_RED
         return false
     end
-    local sigs={
-        {label="buy,id",     fn=function() return MerchantRequest:InvokeServer("buy",item.itemid) end},
-        {label="purchase,id",fn=function() return MerchantRequest:InvokeServer("purchase",item.itemid) end},
-        {label="craft,id",   fn=function() return MerchantRequest:InvokeServer("craft",item.itemid) end},
-        {label="id only",    fn=function() return MerchantRequest:InvokeServer(item.itemid) end},
-        {label="buy,id,qty", fn=function() return MerchantRequest:InvokeServer("buy",item.itemid,item.qty) end},
-        {label="id,qty",     fn=function() return MerchantRequest:InvokeServer(item.itemid,item.qty) end},
-        {label="buy,id,1",   fn=function() return MerchantRequest:InvokeServer("buy",item.itemid,1) end},
-        {label="table",      fn=function() return MerchantRequest:InvokeServer({itemid=item.itemid,quantity=item.qty}) end},
+    -- Primary method: just the item ID (confirmed working from your source)
+    local ok, r = pcall(function()
+        return MerchantRequest:InvokeServer(item.itemid)
+    end)
+    print("[CW Craft] itemid="..tostring(item.itemid).." ok="..tostring(ok).." result="..tostring(r))
+    if ok then return true end
+
+    -- Fallback methods
+    local fallbacks = {
+        function() return MerchantRequest:InvokeServer("buy", item.itemid) end,
+        function() return MerchantRequest:InvokeServer("craft", item.itemid) end,
+        function() return MerchantRequest:InvokeServer(item.itemid, 1) end,
     }
-    for _,sig in ipairs(sigs) do
-        local ok,r=pcall(sig.fn)
-        print("[CW Craft] sig=["..sig.label.."] ok="..tostring(ok).." result="..tostring(r))
-        if ok and r~=nil and r~=false then
-            print("[CW Craft] ✅ Working sig: "..sig.label)
+    for _, fn in ipairs(fallbacks) do
+        local ok2, r2 = pcall(fn)
+        if ok2 then
+            print("[CW Craft] fallback worked, result="..tostring(r2))
             return true
         end
     end
-    print("[CW Craft] ❌ All sigs failed for itemid="..tostring(item.itemid))
     return false
 end
 
 local function runAutoCraft()
     local n=0 for _ in pairs(craftSelected) do n+=1 end
-    if n==0 then craftStatusLbl.Text="⚠ Select items first" craftStatusLbl.TextColor3=C_GOLD return end
+    if n==0 then craftStatusLbl.Text="⚠ No whitelisted items in stock" craftStatusLbl.TextColor3=C_GOLD return end
     local bought=0
     for itemid,_ in pairs(craftSelected) do
         if not craftEnabled then break end
@@ -1125,7 +1241,7 @@ local function runAutoCraft()
                 craftCount+=1 bought+=1 updateSelectedCount()
                 craftStatusLbl.Text="✅ "..name.." "..q.."/"..canBuy craftStatusLbl.TextColor3=C_GREEN
             else
-                break -- stop if purchase fails
+                break
             end
             task.wait(0.4)
         end
@@ -1133,102 +1249,78 @@ local function runAutoCraft()
     if bought>0 then
         craftStatusLbl.Text="✅ Bought "..bought.." total! Watching..." craftStatusLbl.TextColor3=C_GREEN
     else
-        craftStatusLbl.Text="⏳ None ready - watching for merchant..." craftStatusLbl.TextColor3=C_GOLD
+        craftStatusLbl.Text="⏳ None matched - watching for merchant..." craftStatusLbl.TextColor3=C_GOLD
     end
 end
 
 local craftChangedConn = nil
-
-local function onMerchantArrived()
-    if not craftEnabled then return end
-    local raw = MerchantItems and MerchantItems.Value or ""
-    if raw=="" or raw=="[]" then
-        merchantStock={}
-        rebuildCraftList()
-        craftStatusLbl.Text="🔴 Armed - waiting for merchant..."
-        craftStatusLbl.TextColor3=C_GOLD
-        return
-    end
-    loadMerchantItems()
-    local hasMatch=false
-    for itemid,_ in pairs(craftSelected) do
-        if merchantStock[itemid] then hasMatch=true break end
-    end
-    if not hasMatch then
-        craftStatusLbl.Text="🟡 Merchant here - none of your picks available"
-        craftStatusLbl.TextColor3=C_GOLD
-        return
-    end
-    craftStatusLbl.Text="🛒 Merchant arrived! Crafting..."
-    craftStatusLbl.TextColor3=C_GREEN
-    task.wait(0.3)
-    if craftEnabled then runAutoCraft() end
-    if craftEnabled then
-        craftStatusLbl.Text="🔴 Armed - waiting for next merchant..."
-        craftStatusLbl.TextColor3=C_GOLD
-    end
-end
+local craftProcessing = false
 
 local function startCraftLoop()
     if craftLooping then return end
-    craftLooping=true
-
-    craftStatusLbl.Text="🔴 Armed - waiting for merchant..."
+    craftLooping = true
+    craftStatusLbl.Text="🔴 Waiting for merchant..."
     craftStatusLbl.TextColor3=C_GOLD
-
     if craftChangedConn then craftChangedConn:Disconnect() craftChangedConn=nil end
 
-    if MerchantItems then
-        craftChangedConn = MerchantItems.Changed:Connect(function()
-            if craftEnabled then
-                task.spawn(onMerchantArrived)
-            end
-        end)
-    end
-
     task.spawn(function()
-        if MerchantItems and MerchantItems.Value~="" and MerchantItems.Value~="[]" then
-            task.spawn(onMerchantArrived)
-        end
-
-        local lastHash = MerchantItems and MerchantItems.Value or ""
+        local lastHash=""
         while craftEnabled do
-            task.wait(2)
-            if not craftEnabled then break end
-            if MerchantItems then
-                local raw=MerchantItems.Value
-                if raw~=lastHash then
-                    lastHash=raw
-                    task.spawn(onMerchantArrived)
+            if not MerchantItems then task.wait(2) continue end
+            local raw=MerchantItems.Value
+            if raw~=lastHash then
+                lastHash=raw
+                if raw~="" and raw~="[]" and not craftProcessing then
+                    craftProcessing=true
+                    loadMerchantItems()
+                    local hasMatch=false
+                    for itemid,_ in pairs(craftSelected) do
+                        if merchantStock[itemid] then hasMatch=true break end
+                    end
+                    if hasMatch then
+                        craftStatusLbl.Text="🛒 Whitelisted items found! Crafting..."
+                        craftStatusLbl.TextColor3=C_GREEN
+                        task.wait(0.3)
+                        if craftEnabled then runAutoCraft() end
+                        if craftEnabled then
+                            craftStatusLbl.Text="🔴 Waiting for next merchant..."
+                            craftStatusLbl.TextColor3=C_GOLD
+                        end
+                    else
+                        local stkCount=0 for _ in pairs(merchantStock) do stkCount+=1 end
+                        craftStatusLbl.Text="Merchant: "..stkCount.." items | No whitelist match"
+                        craftStatusLbl.TextColor3=C_GOLD
+                    end
+                    craftProcessing=false
+                elseif raw=="" or raw=="[]" then
+                    merchantStock={}
+                    craftSelected={}
+                    rebuildCraftList()
+                    craftStatusLbl.Text="🔴 Waiting for merchant..."
+                    craftStatusLbl.TextColor3=C_GOLD
                 end
             end
+            task.wait(1)
         end
-
         craftLooping=false
+        craftProcessing=false
         if craftChangedConn then craftChangedConn:Disconnect() craftChangedConn=nil end
-        craftStatusLbl.Text="⬜ Auto Craft: OFF" craftStatusLbl.TextColor3=Color3.fromRGB(120,120,145)
+        craftStatusLbl.Text="⬜ Craft: OFF" craftStatusLbl.TextColor3=Color3.fromRGB(120,120,145)
     end)
 end
 
 CraftBtn.MouseButton1Click:Connect(function()
     craftEnabled=not craftEnabled
     if craftEnabled then
-        local n=0 for _ in pairs(craftSelected) do n+=1 end
-        if n==0 then
-            craftEnabled=false
-            craftStatusLbl.Text="⚠ Select items first!"
-            craftStatusLbl.TextColor3=C_RED
-            return
-        end
-        CraftBtn.Text="■  STOP AUTO CRAFT" CraftBtn.TextColor3=C_RED
+        CraftBtn.Text="■ STOP CRAFT" CraftBtn.TextColor3=C_RED
         CraftBtn.BackgroundColor3=Color3.fromRGB(50,16,16) CraftStroke.Color=C_RED
         startCraftLoop()
     else
-        CraftBtn.Text="▶  START AUTO CRAFT" CraftBtn.TextColor3=C_ORANGE
+        CraftBtn.Text="▶ START CRAFT" CraftBtn.TextColor3=C_ORANGE
         CraftBtn.BackgroundColor3=Color3.fromRGB(55,25,5) CraftStroke.Color=C_ORANGE
         if craftChangedConn then craftChangedConn:Disconnect() craftChangedConn=nil end
-        craftStatusLbl.Text="⬜ Auto Craft: OFF" craftStatusLbl.TextColor3=Color3.fromRGB(120,120,145)
+        craftStatusLbl.Text="⬜ Craft: OFF" craftStatusLbl.TextColor3=Color3.fromRGB(120,120,145)
     end
 end)
 
-print("[CW Auto] Loaded!")
+print("[CW Auto] Loaded! Whitelist craft active.")
