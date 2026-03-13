@@ -14,37 +14,43 @@ local VERBOSUS_WAIT = 13
 local VERBOSUS_NAME = "Verbosus, Ruler of Space"
 local MINE_FOLDERS  = {Mine1="Mine", Mine2="Mine2", Mine3="Mine3"}
 
--- CRAFT WHITELIST: item names that will be AUTO-SELECTED in the craft tab
+-- CRAFT WHITELIST: item IDs that will be AUTO-SELECTED in the craft tab
+-- IDs confirmed correct by matching Items:GetChildren() index to merchant itemid
 local CRAFT_WHITELIST = {
     -- Ores
-    ["Divumite"]=true,["Divumite2"]=true,["Divumite3"]=true,
-    ["Rolite"]=true,["Rolite2"]=true,["Rolite3"]=true,
-    ["Dankite"]=true,["Dankite2"]=true,["Dankite3"]=true,
-    ["Regite"]=true,["Regite2"]=true,["Regite3"]=true,
-    ["Amberstone"]=true,["Amberstone2"]=true,["Amberstone3"]=true,
-    ["Optimum"]=true,["Optimum2"]=true,["Optimum3"]=true,
-    ["Ultimus"]=true,["Ultimus2"]=true,["Ultimus3"]=true,
-    ["Vermite"]=true,["Vermite2"]=true,["Vermite3"]=true,
-    ["Plutonium"]=true,["Plutonium2"]=true,["Plutonium3"]=true,
-    ["Uranium"]=true,["Uranium2"]=true,["Uranium3"]=true,
+    [88]=true,   -- Divumite
+    [40]=true,   -- Rolite
+    [75]=true,   -- Dankite
+    [69]=true,   -- Regite
+    [460]=true,  -- Amberstone
+    [251]=true,  -- Optimum
+    [277]=true,  -- UltimusOre
+    [12]=true,   -- Plutonium
+    [68]=true,   -- Uranium
     -- Chaos Shards
-    ["ChaosShard1"]=true,["ChaosShard2"]=true,["ChaosShard3"]=true,
-    ["ChaosShard4"]=true,["ChaosShard5"]=true,["ChaosShard6"]=true,
-    ["ChaosShard7"]=true,["ChaosShard8"]=true,["ChaosShard9"]=true,
+    [688]=true,  -- ChaosShard1
+    [566]=true,  -- ChaosShard2
+    [574]=true,  -- ChaosShard3
+    [435]=true,  -- ChaosShard4
+    [578]=true,  -- ChaosShard5
+    [579]=true,  -- ChaosShard6
+    [581]=true,  -- ChaosShard7
+    [600]=true,  -- ChaosShard8
+    [573]=true,  -- ChaosShard9
     -- Materials
-    ["RulerGem"]=true,
-    ["ShardoftheUniverse"]=true,
-    ["DarknessGem"]=true,
+    [470]=true,  -- RulerGem
+    [163]=true,  -- ShardoftheUniverse
+    [659]=true,  -- DarknessGem
     -- Rare Items
-    ["CoinGun"]=true,
-    ["SanctusExcal"]=true,
-    ["rosshammer"]=true,
-    ["ScepterOfTime"]=true,
-    ["CosmicSea"]=true,
-    ["RealityBender"]=true,
-    ["zephyrplush"]=true,
-    ["suplush"]=true,
-    ["moefuplush"]=true,
+    [620]=true,  -- CoinGun (Greed's Judgement ingredient)
+    [730]=true,  -- SanctusExcal
+    [841]=true,  -- rosshammer (Ross' Divine Hammer)
+    [680]=true,  -- ScepterOfTime (Chronos' Verdict)
+    [817]=true,  -- CosmicSea (Oceanus)
+    [840]=true,  -- RealityBender (Creation Bender)
+    [569]=true,  -- zephyrplush (Gear's Plushie)
+    [717]=true,  -- suplush (Poisonlord65's Plushie)
+    [733]=true,  -- moefuplush (Chiwawa897's Plushie)
 }
 
 local BIOME_LIST = {
@@ -1165,7 +1171,7 @@ local function loadMerchantItems()
     -- AUTO SELECT whitelisted items that are in stock
     craftSelected = {}
     for _, item in ipairs(merchantItems) do
-        if CRAFT_WHITELIST[item.name] then
+        if CRAFT_WHITELIST[item.itemid] then
             craftSelected[item.itemid] = true
         end
     end
