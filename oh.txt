@@ -1,0 +1,1234 @@
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RS = game:GetService("ReplicatedStorage")
+local LP = Players.LocalPlayer
+
+local MINE_INTERVAL = 1
+local HITS_PER_ORE  = 10000
+local PICKAXE_NAME  = "Unobtanium Pickaxe"
+local WEAPON_NAME   = "Greataxe of Annihilation"
+local KILL_INTERVAL = 0.01
+local KILL_HITS     = 1000000000
+local KILL_RANGE    = 9999
+local VERBOSUS_WAIT = 13
+local VERBOSUS_NAME = "Verbosus, Ruler of Space"
+local MINE_FOLDERS  = {Mine1="Mine", Mine2="Mine2", Mine3="Mine3"}
+
+local BIOME_LIST = {
+    {id=0,name="Default",rank=1},{id=1,name="Biome 1",rank=100},
+    {id=2,name="Biome 2",rank=75},{id=3,name="Biome 3",rank=75},
+    {id=4,name="Biome 4",rank=125},{id=5,name="Biome 5",rank=75},
+    {id=6,name="Biome 6",rank=75},{id=7,name="Biome 7",rank=75},
+    {id=8,name="Biome 8",rank=75},{id=9,name="Biome 9",rank=75},
+    {id=10,name="Biome 10",rank=700},{id=11,name="Biome 11",rank=200},
+    {id=12,name="Biome 12",rank=75},{id=13,name="Biome 13",rank=500},
+    {id=14,name="Biome 14",rank=400},{id=15,name="Biome 15",rank=500},
+    {id=16,name="Biome 16",rank=500},{id=17,name="Biome 17",rank=1500},
+    {id=18,name="Biome 18",rank=250},{id=19,name="Biome 19",rank=700},
+    {id=20,name="Biome 20",rank=400},{id=21,name="Biome 21",rank=1300},
+    {id=22,name="Biome 22",rank=500},{id=23,name="Biome 23",rank=700},
+    {id=24,name="Biome 24",rank=666},{id=25,name="Biome 25",rank=500},
+    {id=26,name="Biome 26",rank=900},{id=27,name="Biome 27",rank=1000},
+    {id=28,name="Biome 28",rank=6500},{id=29,name="Biome 29",rank=3500},
+    {id=30,name="Biome 30",rank=900},{id=31,name="Biome 31",rank=3000},
+    {id=32,name="Biome 32",rank=6500},{id=33,name="Biome 33",rank=150},
+    {id=34,name="Biome 34",rank=4000},{id=35,name="Biome 35",rank=1600},
+    {id=36,name="Biome 36",rank=1000},{id=37,name="Biome 37",rank=12000},
+    {id=38,name="Biome 38",rank=25000},{id=39,name="Biome 39",rank=10000},
+    {id=40,name="Biome 40",rank=30000},
+}
+
+local ORE_SET = {}
+for _,v in ipairs({
+    "Uru","Uru2","Uru3","Tanazite","Tanazite2","Tanazite3",
+    "Uranium","Uranium2","Uranium3","Plutonium","Plutonium2","Plutonium3",
+    "Voidite","Voidite2","Voidite3","Unobtanium","Unobtanium2","Unobtanium3",
+    "Unobtainium","Unobtainium2","Unobtainium3","Rolite","Rolite2","Rolite3",
+    "Regite","Regite2","Regite3","Demonite","Demonite2","Demonite3",
+    "Dankite","Dankite2","Dankite3","Divumite","Divumite2","Divumite3",
+    "Purple Vermite","Purple Vermite2","Purple Vermite3",
+    "Green Vermite","Green Vermite2","Green Vermite3",
+    "Optimum","Optimum2","Optimum3","Amberstone","Amberstone2","Amberstone3",
+    "Pure Amberstone","Pure Amberstone2","Pure Amberstone3",
+    "Ultimus","Ultimus2","Ultimus3","Viridis","Viridis2","Viridis3",
+    "Vermite","Vermite2","Vermite3","Iron","Iron2","Iron3",
+    "Gold","Gold2","Gold3","Diamond","Diamond2","Diamond3",
+    "Bluesteel","Bluesteel2","Bluesteel3","Crystal","Crystal2","Crystal3",
+}) do ORE_SET[v] = true end
+
+local old = LP.PlayerGui:FindFirstChild("CWGui")
+if old then old:Destroy() end
+
+local C_BG     = Color3.fromRGB(11,11,16)
+local C_TITLE  = Color3.fromRGB(16,16,24)
+local C_CARD   = Color3.fromRGB(18,18,26)
+local C_GREEN  = Color3.fromRGB(75,215,115)
+local C_DIM    = Color3.fromRGB(160,160,175)
+local C_RED    = Color3.fromRGB(255,80,80)
+local C_BLUE   = Color3.fromRGB(80,200,255)
+local C_GOLD   = Color3.fromRGB(255,185,55)
+local C_PURPLE = Color3.fromRGB(195,80,255)
+
+local minimized   = false
+local dragActive  = false
+local dragOffsetX = 0
+local dragOffsetY = 0
+local mineEnabled = {Mine1=false,Mine2=false,Mine3=false}
+local mineLooping = {Mine1=false,Mine2=false,Mine3=false}
+local mineStats   = {Mine1=0,Mine2=0,Mine3=0}
+local killEnabled = false
+local killLooping = false
+local killCount   = 0
+local biomeEnabled = false
+local biomeLooping = false
+local biomeCount   = 0
+local selectedBiome = BIOME_LIST[27]
+local verbosusInWorld = false
+local verbosusReady   = false
+local dropOpen = false
+local craftEnabled = false
+local craftLooping = false
+local craftCount   = 0
+local craftSelected = {}
+local merchantItems = {}
+
+local SG = Instance.new("ScreenGui")
+SG.Name = "CWGui"
+SG.ResetOnSpawn = false
+SG.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+SG.IgnoreGuiInset = true
+SG.Parent = LP.PlayerGui
+
+local Win = Instance.new("Frame")
+Win.Name = "Win"
+Win.Size = UDim2.new(0,300,0,480)
+Win.Position = UDim2.new(0,60,0,60)
+Win.BackgroundColor3 = C_BG
+Win.BorderSizePixel = 0
+Win.Parent = SG
+Instance.new("UICorner",Win).CornerRadius = UDim.new(0,12)
+local WinStroke = Instance.new("UIStroke",Win)
+WinStroke.Color = C_GREEN
+WinStroke.Thickness = 1.5
+
+local TBar = Instance.new("Frame")
+TBar.Size = UDim2.new(1,0,0,46)
+TBar.BackgroundColor3 = C_TITLE
+TBar.BorderSizePixel = 0
+TBar.ZIndex = 2
+TBar.Parent = Win
+Instance.new("UICorner",TBar).CornerRadius = UDim.new(0,12)
+local TBarFix = Instance.new("Frame")
+TBarFix.Size = UDim2.new(1,0,0,12)
+TBarFix.Position = UDim2.new(0,0,1,-12)
+TBarFix.BackgroundColor3 = C_TITLE
+TBarFix.BorderSizePixel = 0
+TBarFix.ZIndex = 2
+TBarFix.Parent = TBar
+
+local TitleLbl = Instance.new("TextLabel")
+TitleLbl.Size = UDim2.new(1,-50,1,0)
+TitleLbl.Position = UDim2.new(0,14,0,0)
+TitleLbl.BackgroundTransparency = 1
+TitleLbl.Text = "⚔  CRAFTWARS AUTO"
+TitleLbl.TextColor3 = C_GREEN
+TitleLbl.TextSize = 14
+TitleLbl.Font = Enum.Font.GothamBold
+TitleLbl.TextXAlignment = Enum.TextXAlignment.Left
+TitleLbl.ZIndex = 3
+TitleLbl.Parent = TBar
+
+local MinBtn = Instance.new("TextButton")
+MinBtn.Size = UDim2.new(0,28,0,28)
+MinBtn.BackgroundColor3 = Color3.fromRGB(32,32,44)
+MinBtn.Text = "-"
+MinBtn.TextColor3 = Color3.fromRGB(200,200,200)
+MinBtn.TextSize = 14
+MinBtn.Font = Enum.Font.GothamBold
+MinBtn.BorderSizePixel = 0
+MinBtn.ZIndex = 100
+MinBtn.AutoButtonColor = false
+MinBtn.Parent = SG
+Instance.new("UICorner",MinBtn).CornerRadius = UDim.new(0,6)
+
+local DragBtn = Instance.new("TextButton")
+DragBtn.Size = UDim2.new(0,256,0,46)
+DragBtn.BackgroundTransparency = 1
+DragBtn.Text = ""
+DragBtn.ZIndex = 99
+DragBtn.AutoButtonColor = false
+DragBtn.Parent = SG
+
+local function syncOverlays()
+    local x = Win.Position.X.Offset
+    local y = Win.Position.Y.Offset
+    DragBtn.Position  = UDim2.new(0, x, 0, y)
+    MinBtn.Position   = UDim2.new(0, x+262, 0, y+9)
+end
+syncOverlays()
+
+DragBtn.MouseButton1Down:Connect(function()
+    local m = UIS:GetMouseLocation()
+    dragActive  = true
+    dragOffsetX = m.X - Win.Position.X.Offset
+    dragOffsetY = m.Y - Win.Position.Y.Offset
+end)
+
+UIS.InputChanged:Connect(function(i)
+    if dragActive and i.UserInputType == Enum.UserInputType.MouseMovement then
+        local m = UIS:GetMouseLocation()
+        Win.Position = UDim2.new(0, m.X - dragOffsetX, 0, m.Y - dragOffsetY)
+        syncOverlays()
+    end
+end)
+
+UIS.InputEnded:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragActive = false
+    end
+end)
+
+local Body = Instance.new("Frame")
+Body.Size = UDim2.new(1,0,1,-46)
+Body.Position = UDim2.new(0,0,0,46)
+Body.BackgroundTransparency = 1
+Body.Parent = Win
+
+MinBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    Body.Visible = not minimized
+    Win.Size = minimized and UDim2.new(0,300,0,46) or UDim2.new(0,300,0,480)
+    MinBtn.Text = minimized and "+" or "-"
+    syncOverlays()
+end)
+
+local TabBar = Instance.new("Frame")
+TabBar.Size = UDim2.new(1,-20,0,34)
+TabBar.Position = UDim2.new(0,10,0,8)
+TabBar.BackgroundColor3 = Color3.fromRGB(18,18,26)
+TabBar.BorderSizePixel = 0
+TabBar.Parent = Body
+Instance.new("UICorner",TabBar).CornerRadius = UDim.new(0,8)
+
+local function makeTab(txt, xoff, xsz)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(xsz,-4,1,-6)
+    b.Position = UDim2.new(xoff,3,0,3)
+    b.BackgroundColor3 = Color3.fromRGB(28,28,40)
+    b.Text = txt
+    b.TextColor3 = C_DIM
+    b.TextSize = 10
+    b.Font = Enum.Font.GothamBold
+    b.BorderSizePixel = 0
+    b.Parent = TabBar
+    Instance.new("UICorner",b).CornerRadius = UDim.new(0,6)
+    return b
+end
+
+local TabMine  = makeTab("⛏ MINE",   0,   1/4)
+local TabKill  = makeTab("⚔ COMBAT", 1/4, 1/4)
+local TabBiome = makeTab("🌍 BIOME",  2/4, 1/4)
+local TabCraft = makeTab("🔨 CRAFT",  3/4, 1/4)
+
+local ContentMine  = Instance.new("Frame")
+ContentMine.Size = UDim2.new(1,0,1,-50)
+ContentMine.Position = UDim2.new(0,0,0,50)
+ContentMine.BackgroundTransparency = 1
+ContentMine.Parent = Body
+
+local ContentKill  = Instance.new("Frame")
+ContentKill.Size = UDim2.new(1,0,1,-50)
+ContentKill.Position = UDim2.new(0,0,0,50)
+ContentKill.BackgroundTransparency = 1
+ContentKill.Visible = false
+ContentKill.Parent = Body
+
+local ContentBiome = Instance.new("Frame")
+ContentBiome.Size = UDim2.new(1,0,1,-50)
+ContentBiome.Position = UDim2.new(0,0,0,50)
+ContentBiome.BackgroundTransparency = 1
+ContentBiome.Visible = false
+ContentBiome.Parent = Body
+
+local ContentCraft = Instance.new("Frame")
+ContentCraft.Size = UDim2.new(1,0,1,-50)
+ContentCraft.Position = UDim2.new(0,0,0,50)
+ContentCraft.BackgroundTransparency = 1
+ContentCraft.Visible = false
+ContentCraft.Parent = Body
+
+local C_ORANGE = Color3.fromRGB(255,140,40)
+
+local function setTab(t)
+    ContentMine.Visible  = t=="mine"
+    ContentKill.Visible  = t=="kill"
+    ContentBiome.Visible = t=="biome"
+    ContentCraft.Visible = t=="craft"
+    local tabs = {mine=TabMine, kill=TabKill, biome=TabBiome, craft=TabCraft}
+    local colors = {mine=C_BLUE, kill=C_RED, biome=C_GREEN, craft=C_ORANGE}
+    local bgs = {
+        mine=Color3.fromRGB(20,45,65),
+        kill=Color3.fromRGB(60,20,20),
+        biome=Color3.fromRGB(20,50,35),
+        craft=Color3.fromRGB(55,30,10)
+    }
+    for k,btn in pairs(tabs) do
+        if k==t then
+            btn.BackgroundColor3 = bgs[k]
+            btn.TextColor3 = colors[k]
+            WinStroke.Color = colors[k]
+        else
+            btn.BackgroundColor3 = Color3.fromRGB(28,28,40)
+            btn.TextColor3 = C_DIM
+        end
+    end
+end
+TabMine.MouseButton1Click:Connect(function()  setTab("mine")  end)
+TabKill.MouseButton1Click:Connect(function()  setTab("kill")  end)
+TabBiome.MouseButton1Click:Connect(function() setTab("biome") end)
+TabCraft.MouseButton1Click:Connect(function() setTab("craft") end)
+setTab("mine")
+
+local function makeCard(parent, yPos, h)
+    local f = Instance.new("Frame")
+    f.Size = UDim2.new(1,-20,0,h)
+    f.Position = UDim2.new(0,10,0,yPos)
+    f.BackgroundColor3 = C_CARD
+    f.BorderSizePixel = 0
+    f.Parent = parent
+    Instance.new("UICorner",f).CornerRadius = UDim.new(0,8)
+    local s = Instance.new("UIStroke",f)
+    s.Color = Color3.fromRGB(38,38,52)
+    s.Thickness = 1
+    return f, s
+end
+
+local function makeBtn(parent, yOff, txt, txtColor, bgColor)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(1,-20,0,36)
+    b.Position = UDim2.new(0,10,0,yOff)
+    b.BackgroundColor3 = bgColor
+    b.Text = txt
+    b.TextColor3 = txtColor
+    b.TextSize = 13
+    b.Font = Enum.Font.GothamBold
+    b.BorderSizePixel = 0
+    b.Parent = parent
+    Instance.new("UICorner",b).CornerRadius = UDim.new(0,10)
+    local s = Instance.new("UIStroke",b)
+    s.Color = txtColor
+    s.Thickness = 1.3
+    return b, s
+end
+
+local function lbl(parent, txt, sz, color, x, y, w, h, align)
+    local l = Instance.new("TextLabel")
+    l.Text = txt
+    l.TextSize = sz
+    l.TextColor3 = color
+    l.Font = Enum.Font.GothamBold
+    l.BackgroundTransparency = 1
+    l.Size = UDim2.new(w,0,0,h)
+    l.Position = UDim2.new(0,x,0,y)
+    l.TextXAlignment = align or Enum.TextXAlignment.Left
+    l.Parent = parent
+    return l
+end
+
+local MineStatusLbl = lbl(ContentMine,"Status: Idle",11,Color3.fromRGB(120,120,145),10,4,1,-20,Enum.TextXAlignment.Left)
+MineStatusLbl.Size = UDim2.new(1,-20,0,18)
+local MineDebugLbl  = lbl(ContentMine,"Last hit: -",10,Color3.fromRGB(65,65,90),10,22,1,-20,Enum.TextXAlignment.Left)
+MineDebugLbl.Size = UDim2.new(1,-20,0,14)
+MineDebugLbl.Font = Enum.Font.Gotham
+
+local mineCountLbls = {}
+local mineBtns = {}
+local mineAccents = {C_BLUE, C_GOLD, C_PURPLE}
+local mineNames = {"Mine 1  (workspace/Mine)","Mine 2  (workspace/Mine2)","Mine 3  (workspace/Mine3)"}
+local mineKeys = {"Mine1","Mine2","Mine3"}
+
+for i=1,3 do
+    local yp = 42 + (i-1)*72
+    local card, cs = makeCard(ContentMine, yp, 64)
+    cs.Color = Color3.fromRGB(38,38,52)
+    lbl(card,"⛏ "..mineNames[i],12,Color3.fromRGB(215,215,228),12,10,0.65,0,Enum.TextXAlignment.Left).Size=UDim2.new(0.65,0,0,20)
+    local cl = lbl(card,"Ores mined: 0",10,Color3.fromRGB(80,80,105),12,36,1,-24,Enum.TextXAlignment.Left)
+    cl.Font = Enum.Font.Gotham
+    cl.Size = UDim2.new(1,-24,0,14)
+    mineCountLbls[i] = cl
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0,64,0,26)
+    btn.Position = UDim2.new(1,-76,0.5,-13)
+    btn.BackgroundColor3 = Color3.fromRGB(28,28,42)
+    btn.Text = "START"
+    btn.TextColor3 = mineAccents[i]
+    btn.TextSize = 11
+    btn.Font = Enum.Font.GothamBold
+    btn.BorderSizePixel = 0
+    btn.Parent = card
+    Instance.new("UICorner",btn).CornerRadius = UDim.new(0,6)
+    local bs = Instance.new("UIStroke",btn)
+    bs.Color = mineAccents[i]
+    bs.Thickness = 1.1
+    mineBtns[i] = btn
+end
+
+local AllMineBtn, AllMineStroke = makeBtn(ContentMine, nil, "▶  START ALL MINES", C_GREEN, Color3.fromRGB(18,50,28))
+AllMineBtn.Position = UDim2.new(0,10,1,-40)
+AllMineBtn.Size = UDim2.new(1,-20,0,28)
+AllMineBtn.TextSize = 11
+Instance.new("UICorner",AllMineBtn).CornerRadius = UDim.new(0,8)
+
+local killCard, killCardStroke = makeCard(ContentKill, 8, 100)
+killCardStroke.Color = Color3.fromRGB(40,40,55)
+lbl(killCard,"⚔",24,C_RED,0,8,1,0,Enum.TextXAlignment.Center).Size=UDim2.new(1,0,0,32)
+lbl(killCard,"AUTO KILL MOBS",13,Color3.fromRGB(215,215,228),0,42,1,0,Enum.TextXAlignment.Center).Size=UDim2.new(1,0,0,18)
+local KillCountLbl = lbl(killCard,"Mobs hit: 0",11,Color3.fromRGB(85,85,108),0,62,1,0,Enum.TextXAlignment.Center)
+KillCountLbl.Size=UDim2.new(1,0,0,16) KillCountLbl.Font=Enum.Font.Gotham
+local KillStatusLbl = lbl(killCard,"Status: Idle",10,Color3.fromRGB(120,120,145),0,80,1,0,Enum.TextXAlignment.Center)
+KillStatusLbl.Size=UDim2.new(1,0,0,14) KillStatusLbl.Font=Enum.Font.Gotham
+
+local verbCard, verbStroke = makeCard(ContentKill, 116, 36)
+verbCard.BackgroundColor3 = Color3.fromRGB(20,16,10)
+verbStroke.Color = Color3.fromRGB(180,140,30)
+local VerbLbl = lbl(verbCard,"⚠ Verbosus: Not detected",10,Color3.fromRGB(200,160,60),8,0,1,-16,Enum.TextXAlignment.Left)
+VerbLbl.Size=UDim2.new(1,-16,1,0) VerbLbl.TextWrapped=true
+
+local wlbl = Instance.new("TextLabel")
+wlbl.Size=UDim2.new(1,-20,0,24) wlbl.Position=UDim2.new(0,10,0,160)
+wlbl.BackgroundColor3=Color3.fromRGB(20,20,30) wlbl.BorderSizePixel=0
+wlbl.Text="🗡 "..WEAPON_NAME wlbl.TextColor3=Color3.fromRGB(180,130,255)
+wlbl.TextSize=10 wlbl.Font=Enum.Font.Gotham
+wlbl.TextXAlignment=Enum.TextXAlignment.Center wlbl.Parent=ContentKill
+Instance.new("UICorner",wlbl).CornerRadius=UDim.new(0,6)
+
+local KillBtn, KillStroke = makeBtn(ContentKill, nil, "▶  START AUTO KILL", C_GREEN, Color3.fromRGB(22,50,28))
+KillBtn.Position = UDim2.new(0,10,1,-44)
+
+local bStatusCard, _ = makeCard(ContentBiome, 4, 60)
+bStatusCard.BackgroundColor3 = C_CARD
+local bsStroke = Instance.new("UIStroke",bStatusCard)
+bsStroke.Color = Color3.fromRGB(40,80,55) bsStroke.Thickness=1
+local BiomeStatusLbl = lbl(bStatusCard,"Status: Idle",10,Color3.fromRGB(120,120,145),0,6,1,0,Enum.TextXAlignment.Center)
+BiomeStatusLbl.Size=UDim2.new(1,0,0,18) BiomeStatusLbl.Font=Enum.Font.Gotham
+local BiomeCountLbl = lbl(bStatusCard,"Summoned: 0",10,Color3.fromRGB(80,80,105),0,26,1,0,Enum.TextXAlignment.Center)
+BiomeCountLbl.Size=UDim2.new(1,0,0,16) BiomeCountLbl.Font=Enum.Font.Gotham
+local BiomeActiveLbl = lbl(bStatusCard,"",10,C_GREEN,0,44,1,0,Enum.TextXAlignment.Center)
+BiomeActiveLbl.Size=UDim2.new(1,0,0,14)
+
+local DropBtn = Instance.new("TextButton")
+DropBtn.Size=UDim2.new(1,-20,0,40) DropBtn.Position=UDim2.new(0,10,0,72)
+DropBtn.BackgroundColor3=Color3.fromRGB(18,28,20) DropBtn.BorderSizePixel=0
+DropBtn.Text="" DropBtn.Parent=ContentBiome
+Instance.new("UICorner",DropBtn).CornerRadius=UDim.new(0,8)
+local DropBtnStroke=Instance.new("UIStroke",DropBtn) DropBtnStroke.Color=C_GREEN DropBtnStroke.Thickness=1.3
+local DropBtnLbl=Instance.new("TextLabel")
+DropBtnLbl.Size=UDim2.new(1,-40,1,0) DropBtnLbl.Position=UDim2.new(0,12,0,0)
+DropBtnLbl.BackgroundTransparency=1 DropBtnLbl.Text="🌍  Biome 26  (Rank 900)"
+DropBtnLbl.TextColor3=C_GREEN DropBtnLbl.TextSize=12
+DropBtnLbl.Font=Enum.Font.GothamBold DropBtnLbl.TextXAlignment=Enum.TextXAlignment.Left
+DropBtnLbl.Parent=DropBtn
+local DropArrow=Instance.new("TextLabel")
+DropArrow.Size=UDim2.new(0,28,1,0) DropArrow.Position=UDim2.new(1,-30,0,0)
+DropArrow.BackgroundTransparency=1 DropArrow.Text="▼"
+DropArrow.TextColor3=C_GREEN DropArrow.TextSize=12
+DropArrow.Font=Enum.Font.GothamBold DropArrow.TextXAlignment=Enum.TextXAlignment.Center
+DropArrow.Parent=DropBtn
+
+local DROP_ROW=34 local DROP_SHOW=6
+local DROP_H=DROP_SHOW*DROP_ROW
+local TOTAL_H=#BIOME_LIST*DROP_ROW
+local MAX_SCROLL=math.max(0,TOTAL_H-DROP_H)
+
+local DropPanel=Instance.new("Frame")
+DropPanel.Size=UDim2.new(1,-20,0,DROP_H)
+DropPanel.Position=UDim2.new(0,10,0,116)
+DropPanel.BackgroundColor3=Color3.fromRGB(16,16,22)
+DropPanel.BorderSizePixel=0 DropPanel.Visible=false DropPanel.ZIndex=10
+DropPanel.Parent=ContentBiome
+Instance.new("UICorner",DropPanel).CornerRadius=UDim.new(0,8)
+Instance.new("UIStroke",DropPanel).Color=C_GREEN
+
+local SF=Instance.new("ScrollingFrame")
+SF.Size=UDim2.new(1,0,1,0) SF.Position=UDim2.new(0,0,0,0)
+SF.BackgroundTransparency=1 SF.BorderSizePixel=0
+SF.ScrollBarThickness=6 SF.ScrollBarImageColor3=C_GREEN
+SF.ScrollingDirection=Enum.ScrollingDirection.Y
+SF.CanvasSize=UDim2.new(0,0,0,TOTAL_H)
+SF.ZIndex=11 SF.Parent=DropPanel
+
+local dropRows={}
+for i,biome in ipairs(BIOME_LIST) do
+    local row=Instance.new("TextButton")
+    row.Size=UDim2.new(1,0,0,DROP_ROW-1)
+    row.Position=UDim2.new(0,0,0,(i-1)*DROP_ROW)
+    row.BackgroundColor3=Color3.fromRGB(18,18,28)
+    row.BorderSizePixel=0 row.Text="" row.ZIndex=12 row.Parent=SF
+    local sel=Instance.new("Frame")
+    sel.Size=UDim2.new(0,3,1,0) sel.BackgroundColor3=C_GREEN
+    sel.BorderSizePixel=0 sel.Visible=false sel.ZIndex=13 sel.Parent=row
+    Instance.new("UICorner",sel).CornerRadius=UDim.new(0,2)
+    local nl=Instance.new("TextLabel")
+    nl.Size=UDim2.new(0.62,0,1,0) nl.Position=UDim2.new(0,10,0,0)
+    nl.BackgroundTransparency=1 nl.Text=biome.name
+    nl.TextColor3=C_DIM nl.TextSize=12
+    nl.Font=Enum.Font.GothamBold nl.TextXAlignment=Enum.TextXAlignment.Left
+    nl.ZIndex=13 nl.Parent=row
+    local rl=Instance.new("TextLabel")
+    rl.Size=UDim2.new(0.36,0,1,0) rl.Position=UDim2.new(0.62,0,0,0)
+    rl.BackgroundTransparency=1 rl.Text="Rank "..biome.rank
+    rl.TextColor3=Color3.fromRGB(80,80,100) rl.TextSize=10
+    rl.Font=Enum.Font.Gotham rl.TextXAlignment=Enum.TextXAlignment.Right
+    rl.ZIndex=13 rl.Parent=row
+    dropRows[i]={row=row,sel=sel,nl=nl,biome=biome}
+    local cap=biome
+    row.MouseButton1Click:Connect(function()
+        selectedBiome=cap
+        DropBtnLbl.Text="🌍  "..cap.name.."  (Rank "..cap.rank..")"
+        for _,dr in ipairs(dropRows) do
+            local a=dr.biome.id==cap.id
+            dr.sel.Visible=a
+            dr.nl.TextColor3=a and C_GREEN or C_DIM
+            dr.row.BackgroundColor3=a and Color3.fromRGB(20,35,22) or Color3.fromRGB(18,18,28)
+        end
+        if biomeEnabled then
+            task.spawn(function()
+                BiomeStatusLbl.Text="🔄 Switching..." BiomeStatusLbl.TextColor3=C_GOLD
+                task.wait(0.3)
+                pcall(function() RS.SummonBiome:FireServer(selectedBiome.id) end)
+                biomeCount+=1
+                BiomeCountLbl.Text="Summoned: "..biomeCount
+                BiomeStatusLbl.Text="🌍 Active: "..selectedBiome.name
+                BiomeStatusLbl.TextColor3=C_GREEN
+                BiomeActiveLbl.Text="▶ "..selectedBiome.name
+            end)
+        end
+    end)
+end
+dropRows[27].sel.Visible=true
+dropRows[27].nl.TextColor3=C_GREEN
+dropRows[27].row.BackgroundColor3=Color3.fromRGB(20,35,22)
+
+DropBtn.MouseButton1Click:Connect(function()
+    dropOpen=not dropOpen
+    DropPanel.Visible=dropOpen
+    DropArrow.Text=dropOpen and "▲" or "▼"
+    if dropOpen then
+        for i,dr in ipairs(dropRows) do
+            if dr.biome.id==selectedBiome.id then
+                SF.CanvasPosition=Vector2.new(0,math.clamp((i-1)*DROP_ROW-DROP_H/2,0,MAX_SCROLL))
+                break
+            end
+        end
+    end
+end)
+
+UIS.InputBegan:Connect(function(inp)
+    if inp.UserInputType~=Enum.UserInputType.MouseButton1 then return end
+    if not dropOpen then return end
+    local m=UIS:GetMouseLocation()
+    local dp=DropBtn.AbsolutePosition local ds=DropBtn.AbsoluteSize
+    local pp=DropPanel.AbsolutePosition local ps=DropPanel.AbsoluteSize
+    local onBtn=m.X>=dp.X and m.X<=dp.X+ds.X and m.Y>=dp.Y and m.Y<=dp.Y+ds.Y
+    local onPanel=m.X>=pp.X and m.X<=pp.X+ps.X and m.Y>=pp.Y and m.Y<=pp.Y+ps.Y
+    if not onBtn and not onPanel then
+        dropOpen=false DropPanel.Visible=false DropArrow.Text="▼"
+    end
+end)
+
+local vwCard,vwStroke=makeCard(ContentBiome,287,36)
+vwCard.BackgroundColor3=Color3.fromRGB(20,16,10)
+vwStroke.Color=Color3.fromRGB(180,140,30)
+local vwLbl=lbl(vwCard,"⚠ Verbosus wait (s):",10,Color3.fromRGB(200,160,60),8,0,0.55,0,Enum.TextXAlignment.Left)
+vwLbl.Size=UDim2.new(0.55,0,1,0)
+local vwBox=Instance.new("TextBox")
+vwBox.Size=UDim2.new(0,42,0,22) vwBox.Position=UDim2.new(0.56,0,0.5,-11)
+vwBox.BackgroundColor3=Color3.fromRGB(28,28,42) vwBox.Text=tostring(VERBOSUS_WAIT)
+vwBox.TextColor3=Color3.fromRGB(200,160,60) vwBox.TextSize=12
+vwBox.Font=Enum.Font.GothamBold vwBox.BorderSizePixel=0 vwBox.Parent=vwCard
+Instance.new("UICorner",vwBox).CornerRadius=UDim.new(0,5)
+local vwSet=Instance.new("TextButton")
+vwSet.Size=UDim2.new(0,52,0,22) vwSet.Position=UDim2.new(1,-60,0.5,-11)
+vwSet.BackgroundColor3=Color3.fromRGB(40,30,10) vwSet.Text="SET"
+vwSet.TextColor3=Color3.fromRGB(200,160,60) vwSet.TextSize=10
+vwSet.Font=Enum.Font.GothamBold vwSet.BorderSizePixel=0 vwSet.Parent=vwCard
+Instance.new("UICorner",vwSet).CornerRadius=UDim.new(0,5)
+Instance.new("UIStroke",vwSet).Color=Color3.fromRGB(180,140,30)
+vwSet.MouseButton1Click:Connect(function()
+    local v=tonumber(vwBox.Text)
+    if v and v>=0 then VERBOSUS_WAIT=v else vwBox.Text=tostring(VERBOSUS_WAIT) end
+end)
+
+local BiomeBtn,BiomeStroke=makeBtn(ContentBiome,nil,"▶  START AUTO BIOME",C_GREEN,Color3.fromRGB(18,50,28))
+BiomeBtn.Position=UDim2.new(0,10,1,-44)
+
+local function checkVerbosus()
+    for _,o in ipairs(workspace:GetDescendants()) do
+        if o.Name==VERBOSUS_NAME and o:IsA("Model") then
+            local h=o:FindFirstChild("Humanoid")
+            if h and h.Health>0 then return true end
+        end
+    end
+    return false
+end
+
+local function onVerbSpawn()
+    verbosusInWorld=true verbosusReady=false
+    VerbLbl.Text="⚠ Verbosus! Waiting "..VERBOSUS_WAIT.."s..."
+    VerbLbl.TextColor3=C_RED verbStroke.Color=C_RED
+    task.spawn(function()
+        task.wait(VERBOSUS_WAIT)
+        if verbosusInWorld then
+            verbosusReady=true
+            VerbLbl.Text="✅ Verbosus ready!"
+            VerbLbl.TextColor3=C_GREEN verbStroke.Color=C_GREEN
+        end
+    end)
+end
+
+local function onVerbGone()
+    verbosusInWorld=false verbosusReady=false
+    VerbLbl.Text="⚠ Verbosus: Not detected"
+    VerbLbl.TextColor3=Color3.fromRGB(200,160,60)
+    verbStroke.Color=Color3.fromRGB(180,140,30)
+    if biomeEnabled then
+        task.spawn(function()
+            task.wait(3)
+            if biomeEnabled then
+                doSummon()
+            end
+        end)
+    end
+end
+
+RS.BossSpawnEvent.OnClientEvent:Connect(function(n)
+    if type(n)=="string" and n:find("Verbosus") then onVerbSpawn() end
+end)
+RS.BossKillEvent.OnClientEvent:Connect(function(n)
+    if type(n)=="string" and n:find("Verbosus") then onVerbGone() end
+    if biomeEnabled then
+        lastSummonTick = 0
+    end
+end)
+task.spawn(function()
+    while true do
+        task.wait(2)
+        local f=checkVerbosus()
+        if f and not verbosusInWorld then onVerbSpawn()
+        elseif not f and verbosusInWorld then onVerbGone() end
+    end
+end)
+
+local function getPickaxe()
+    local bp=LP:FindFirstChild("Backpack")
+    local ch=LP.Character
+    local pk=(bp and bp:FindFirstChild(PICKAXE_NAME)) or (ch and ch:FindFirstChild(PICKAXE_NAME))
+    return pk and pk:FindFirstChild("RemoteFunction")
+end
+
+local function searchAndMine(folder,key,cntLbl)
+    for _,child in ipairs(folder:GetChildren()) do
+        if not mineEnabled[key] then return end
+        if ORE_SET[child.Name] then
+            local part=child:FindFirstChild("Ore") or child:FindFirstChildWhichIsA("BasePart")
+            if part and part.Parent then
+                local r=getPickaxe()
+                if r then
+                    pcall(function() r:InvokeServer(unpack({"hit",{part,HITS_PER_ORE}})) end)
+                    mineStats[key]+=1
+                    cntLbl.Text="Ores mined: "..mineStats[key]
+                    MineDebugLbl.Text="Last hit: "..child.Name.." ("..key..")"
+                end
+                task.wait(MINE_INTERVAL)
+            end
+        end
+        if child:IsA("Folder") or child:IsA("Model") then
+            searchAndMine(child,key,cntLbl)
+        end
+    end
+end
+
+local function startMineLoop(key,folderName,cntLbl)
+    if mineLooping[key] then return end
+    mineLooping[key]=true
+    task.spawn(function()
+        while mineEnabled[key] do
+            local f=workspace:FindFirstChild(folderName)
+            if f then searchAndMine(f,key,cntLbl) else task.wait(2) end
+            task.wait(MINE_INTERVAL)
+        end
+        mineLooping[key]=false
+    end)
+end
+
+local function updateMineStatus()
+    local a={}
+    for k,v in pairs(mineEnabled) do if v then a[#a+1]=k end end
+    if #a==0 then
+        MineStatusLbl.Text="Status: Idle" MineStatusLbl.TextColor3=Color3.fromRGB(120,120,145)
+    else
+        MineStatusLbl.Text="⛏ Mining: "..table.concat(a," | ")
+        MineStatusLbl.TextColor3=C_GREEN
+    end
+end
+
+local function setMine(key,folderName,enable,btn,cntLbl)
+    mineEnabled[key]=enable
+    if enable then
+        btn.Text="STOP" btn.TextColor3=C_RED
+        btn.BackgroundColor3=Color3.fromRGB(48,18,18)
+        local s=btn:FindFirstChildOfClass("UIStroke") if s then s.Color=C_RED end
+        startMineLoop(key,folderName,cntLbl)
+    else
+        btn.Text="START" btn.TextColor3=mineAccents[({Mine1=1,Mine2=2,Mine3=3})[key]]
+        btn.BackgroundColor3=Color3.fromRGB(28,28,42)
+        local s=btn:FindFirstChildOfClass("UIStroke")
+        if s then s.Color=mineAccents[({Mine1=1,Mine2=2,Mine3=3})[key]] end
+    end
+    updateMineStatus()
+end
+
+local function startKillLoop()
+    if killLooping then return end
+    killLooping=true
+    task.spawn(function()
+        while killEnabled do
+            local ch=LP.Character
+            local hum=ch and ch:FindFirstChild("Humanoid")
+            if not ch or not hum or hum.Health<=0 then
+                KillStatusLbl.Text="💀 Dead - waiting..."
+                LP.CharacterAdded:Wait() task.wait(2) continue
+            end
+            local bp=LP:FindFirstChild("Backpack")
+            local wp=(ch:FindFirstChild(WEAPON_NAME)) or (bp and bp:FindFirstChild(WEAPON_NAME))
+            if not wp then KillStatusLbl.Text="⚠ Weapon not found..." task.wait(0.5) continue end
+            local hrp=ch:FindFirstChild("HumanoidRootPart")
+            local myPos=hrp and hrp.Position
+            for _,obj in ipairs(workspace:GetDescendants()) do
+                if not killEnabled then break end
+                if not obj or not obj.Parent then continue end
+                if not obj:IsA("Humanoid") then continue end
+                if obj.Health<=0 then continue end
+                if obj.Parent==ch then continue end
+                if not ch:FindFirstChild("Humanoid") or ch.Humanoid.Health<=0 then break end
+                if obj.Parent and obj.Parent.Name==VERBOSUS_NAME and not verbosusReady then continue end
+                if myPos then
+                    local mh=obj.Parent and obj.Parent:FindFirstChild("HumanoidRootPart")
+                    if mh and (mh.Position-myPos).Magnitude>KILL_RANGE then continue end
+                end
+                local wp2=(ch:FindFirstChild(WEAPON_NAME)) or (bp and bp:FindFirstChild(WEAPON_NAME))
+                local r=wp2 and wp2:FindFirstChild("RemoteFunction")
+                if not r then break end
+                pcall(function() r:InvokeServer(unpack({"hit",{obj,KILL_HITS}})) end)
+                killCount+=1
+                KillCountLbl.Text="Mobs hit: "..killCount
+                KillStatusLbl.Text="⚔ "..(obj.Parent and obj.Parent.Name or "?")
+                task.wait(KILL_INTERVAL)
+            end
+            task.wait(KILL_INTERVAL)
+        end
+        killLooping=false KillStatusLbl.Text="Status: Idle"
+    end)
+end
+
+local lastSummonTick = 0
+
+local function doSummon()
+    lastSummonTick = tick()
+    pcall(function() RS.SummonBiome:FireServer(selectedBiome.id) end)
+    biomeCount+=1
+    BiomeCountLbl.Text="Summoned: "..biomeCount
+    BiomeStatusLbl.Text="🌍 Active: "..selectedBiome.name
+    BiomeStatusLbl.TextColor3=C_GREEN
+    BiomeActiveLbl.Text="▶ "..selectedBiome.name
+end
+
+local function onBiomeSelected()
+    if not biomeEnabled then return end
+    BiomeStatusLbl.Text="🔄 Switching..." BiomeStatusLbl.TextColor3=C_GOLD
+    task.wait(0.3)
+    doSummon()
+end
+
+local function getMobFolders()
+    local folders = {}
+    for _, child in ipairs(workspace:GetChildren()) do
+        if child:IsA("Model") and child:FindFirstChild("enemyvalue") then
+            table.insert(folders, child.Name)
+        end
+    end
+    table.sort(folders)
+    return table.concat(folders, ",")
+end
+
+local expectedMobKey = nil
+
+local function startBiomeLoop()
+    if biomeLooping then return end
+    biomeLooping=true
+    task.spawn(function()
+        doSummon()
+        task.wait(4)
+        expectedMobKey = getMobFolders()
+
+        while biomeEnabled do
+            task.wait(2)
+            if not biomeEnabled then break end
+            local current = getMobFolders()
+            if current ~= "" and expectedMobKey ~= nil and current ~= expectedMobKey then
+                doSummon()
+                task.wait(4) -- wait for our biome to fully load
+                expectedMobKey = getMobFolders() -- record new expected
+            end
+        end
+        biomeLooping=false
+        BiomeStatusLbl.Text="Status: Idle" BiomeStatusLbl.TextColor3=Color3.fromRGB(120,120,145)
+        BiomeActiveLbl.Text=""
+    end)
+end
+
+for i=1,3 do
+    local k=mineKeys[i]
+    local fn=MINE_FOLDERS[k]
+    local btn=mineBtns[i]
+    local cl=mineCountLbls[i]
+    btn.MouseButton1Click:Connect(function()
+        setMine(k,fn,not mineEnabled[k],btn,cl)
+    end)
+end
+
+local allOn=false
+AllMineBtn.MouseButton1Click:Connect(function()
+    allOn=not allOn
+    if allOn then
+        AllMineBtn.Text="■  STOP ALL MINES" AllMineBtn.TextColor3=C_RED
+        AllMineBtn.BackgroundColor3=Color3.fromRGB(50,16,16)
+        AllMineStroke.Color=C_RED
+        for i=1,3 do setMine(mineKeys[i],MINE_FOLDERS[mineKeys[i]],true,mineBtns[i],mineCountLbls[i]) end
+    else
+        AllMineBtn.Text="▶  START ALL MINES" AllMineBtn.TextColor3=C_GREEN
+        AllMineBtn.BackgroundColor3=Color3.fromRGB(18,50,28)
+        AllMineStroke.Color=C_GREEN
+        for i=1,3 do setMine(mineKeys[i],MINE_FOLDERS[mineKeys[i]],false,mineBtns[i],mineCountLbls[i]) end
+    end
+end)
+
+KillBtn.MouseButton1Click:Connect(function()
+    killEnabled=not killEnabled
+    if killEnabled then
+        KillBtn.Text="■  STOP AUTO KILL" KillBtn.TextColor3=C_RED
+        KillBtn.BackgroundColor3=Color3.fromRGB(50,16,16)
+        KillStroke.Color=C_RED killCardStroke.Color=C_RED
+        startKillLoop()
+    else
+        KillBtn.Text="▶  START AUTO KILL" KillBtn.TextColor3=C_GREEN
+        KillBtn.BackgroundColor3=Color3.fromRGB(22,50,28)
+        KillStroke.Color=C_GREEN killCardStroke.Color=Color3.fromRGB(40,40,55)
+    end
+end)
+
+BiomeBtn.MouseButton1Click:Connect(function()
+    biomeEnabled=not biomeEnabled
+    if biomeEnabled then
+        BiomeBtn.Text="■  STOP AUTO BIOME" BiomeBtn.TextColor3=C_RED
+        BiomeBtn.BackgroundColor3=Color3.fromRGB(50,16,16)
+        BiomeStroke.Color=C_RED bsStroke.Color=C_RED
+        startBiomeLoop()
+    else
+        BiomeBtn.Text="▶  START AUTO BIOME" BiomeBtn.TextColor3=C_GREEN
+        BiomeBtn.BackgroundColor3=Color3.fromRGB(18,50,28)
+        BiomeStroke.Color=C_GREEN bsStroke.Color=Color3.fromRGB(40,80,55)
+    end
+end)
+
+local _N="1=SparkleFedora,2=AlmightyFireScythe,3=EnchantedIron,4=BlackIron,5=BlackVermiteArmour,6=WindSword,7=UltimateDevestator,8=TrueDevastator,9=TrophyofMight,10=TheRulersGem,11=PlutoniumScythe,12=Plutonium,13=PlasmaKnife,14=OmegaDeathDevastator,15=OceanSword,16=NinjaTrophy,17=NackerDevastator,18=MountainDew,19=LightSword,20=HolyStaff,21=HellstoneAxe,22=FireSword,23=FinalTrophy,24=DarkMatter,25=DarkSword,26=EarthSword,27=DragonTooth,28=DiscordSniper,29=DiscordKnife,30=DestinyDevastator,31=BlackVermiteCatalyst,32=BlackVermiteSword,33=Massacre,34=Excalibur,35=VoidOre,36=HeartbleedSword,37=DemonicBlade,38=Dazzler,39=Stazzler,40=Rolite,41=GreenVermiteArmour,42=GreenVermiteBow,43=GreenVermiteFedora,44=GreenVermiteScythe,45=GreenVermiteSword,46=AlmightyFireBow,47=EnchantedRoyalArmour,48=EnchantedRoyalBow,49=DeathDevastator,50=AlmightyWaterSword,51=RulerSword,52=RulerScythe,53=EnchantedRoyalSword,54=EnchantedRoyalScythe,55=RulerArmour,56=RulerBow,57=RoyalBow,58=RoyalScythe,59=RoyalSword,60=PurpleVermite,61=BlackInferno,62=PurpleVermiteBow,63=PurpleVermiteScythe,64=PurpleVermiteSword,65=RoyalPistol,66=PurpleVermitePistol,67=GreenVermitePistol,68=Uranium,69=Regite,70=AlmightyWaterArmour,71=RoyalArmour,72=GreenM4A1,73=SkyArmour,74=DankOrb,75=Dankite,76=DankArmour,77=EnchantedSkyArmour,78=DankPistol,79=DankSword,80=OnionScythe,81=EnchantedSkySword,82=EnchantedSkyBow,83=EnchantedSkyPistol,84=SkyPistol,85=SkySword,86=SkyScythe,87=SkyBow,88=Divumite,89=BlueM4A1,90=EnchantedSkyScythe,91=PureAmberstone,92=epicorb,93=RedM4A1,94=SkyOrb,95=GreenVermite,96=OmegaDeathBow,97=DankBow,98=OmegaDeathArmour2,99=NackersPistol,100=OmegaDeathArmour,101=DeathsLaserMachineGun,102=NackersLaserMachineGun,103=negativeforce,104=DeathsBow,105=OmegaDeathPistol,106=DeathHorn,107=TrueFireCrown,108=GoldBoombox,109=NackersMysteryBox,110=DarknessSword,111=vantablackrevolver,112=OverseerHelmet,113=KorbloxHelmet,114=Salt,115=voidscythe,116=NackersMinigun,117=DeathsMinigun,118=DestinyMinigun,119=TheShard,120=LOSTSOUL,121=OmegaLantern,122=OmegaDeathOrb,123=DeathOrb,124=OmegaOrb,125=OmegaDeathScythe,126=MidasRay,127=CalamityBlade,128=KatanaofDestiny,129=TrueKatana,130=LightPickaxe,131=HallowOrb,132=NackerArmour,133=voidbow,134=StaffofHealing,135=voidsword,136=Zero's_Pillar,137=DimensionBreaker,138=Scary12,139=VoidOrb,140=RichestFedora,141=TheCatalyst,142=DarkHood,143=KingCrown,144=GoldCrossbow,145=TrophyofRiches,146=BladeofGold,147=GoldShuriken,148=CoinBasket,149=ShardArmour,150=WandofTriplets,151=Garbage,152=VermiculusScythe,153=FusionBlaster,154=VermiculusBow,155=ChampionsTrophy,156=TruePhaser,157=UltimatePhaser,158=PlanetBuster,159=BaneofLife,160=DeathsScythe,161=Galactus,162=MartianPhaser,163=ShardoftheUniverse,164=SwordofDestiny,165=ArmourofDestiny,166=TrueCrescendo,167=Hotdog,168=Jetpack,169=HighVelocitySteamRifle,170=SteamGun,171=SteamSword,172=Cog,173=Beeswax,174=ViridisWings,175=Brain,176=QuickPotion,177=DestinyScythe,178=FirePotion,179=HolySword,180=DeathRay,181=KnightsArmour,182=SwordofFire,183=TrueArmour,184=MeteorStaff,185=OptimumMinigun,186=BeeHive,187=BeeGun,188=ZombieSlayer,189=BlizzardStaff,190=EvilEye,191=OpticWand,192=LaserArmour,193=LaserMachinegun,194=ViridisEgg,195=VermiculusEgg,196=ForsakenSwordNerfed,197=SpaceEgg,198=NackerEgg,199=OptimumEgg,200=HellstoneEgg,201=MysteryEgg,202=DiamondEgg,203=DarkEgg,204=LightEgg,205=FireEgg,206=IceEgg,207=MeteorEgg,208=BeeEgg,209=ZombieEgg,210=IronEgg,211=CthulhusBlade,212=OceanSpellbook,213=Tsunami,214=StaffofStrength,215=UltimateMinigun,216=HerculesHammer,217=HerculesFist,218=ColossalBlade,219=SwordofDarkness,220=HydraStaff,221=ChaosSpellbook,222=ZombieCrossbow,223=CupidsSword,224=Heartbreaker,225=LoveRaygun,226=SeaRevenge,227=WhirlpoolSummoner,228=OceanKatana,229=ZombieStaff,230=TitanShield,231=SnowmanCannon,232=FlowerGun,233=SwordofEvil,234=SkeletonClaws,235=KnightSword,236=SpiderSword,237=OrbofDoom,238=GhostfireDagger,239=DarksteelKatana,240=ChristmasGift,241=ChristmasTreeSword,242=CandyCaneMinigun,243=CandyCaneKatana,244=CandyCane,245=SnowflakeBow,246=TurkeySword,247=TurkeyCannon,248=Turkey,249=DragonfireSword,250=OrbofDestiny,251=Optimum,252=NackersTrueScythe,253=AzureSword,254=UltimateOrb,255=EgyptianBlade,256=PurpleGun,257=FireStaff,258=UltimateArmour,259=Taco,260=EpicArmour,261=AzurewrathReturn,262=InfernoBlade,263=CrimsonHammer,264=Pitchfork,265=ZeveIAssaultRifle,266=ZeveIShotgun,267=ZeveIHandCannon,268=ZeveIBoomstick,269=zeveI,270=KorbloxBow,271=OverseerBow,272=OverseerDagger,273=OverseerCrossbow,274=Cash,275=RainbowArmour,276=RainbowVIP,277=UltimusOre,278=UltimateScythe,279=UltimateCrescendo,280=UltimateKatana,281=RainbowSword,282=Doritos,283=StarfallBow,284=ViridisBow,285=BlizzardStriker,286=Lantern,287=ZeusStaff,288=nacker2,289=nacker,290=epicnacker,291=bengaltiger,292=ZombieLauncher,293=ZombieAxe,294=KorbloxMace,295=WindHorn,296=WhitePhaseblade,297=Waterbrand,298=WaterOrb,299=WaterKatana,300=VoidPhaser,301=ViridisSword,302=ViridisPickaxe,303=ViridisOre,304=ViridisMiniGun,305=ViridisKatana,306=ViridisAxe,307=ViridisArmour,308=VermiculusSword,309=VermiculusPickaxe,310=VermiculusOre,311=VermiculusMiniGun,312=VIP,313=Uzi,314=SwordofSwords,315=Sword,316=SuperVIP,317=SuperSword,318=SuperRocketLauncher,319=SuperLockOn,320=Scary1,321=StarfallOrb,322=StarfallKatana,323=SpeedyPotion,324=SpeedyArmour,325=SpectralSword,326=SorcusSword,327=Sniper,328=SnakeSniper,329=Skullbasher,330=SkeletonSword,331=Shotgun,332=ShadowSword,333=ShadowDancer,334=SeaSword,335=SeaCrossbow,336=ScrollofSevenless,337=ScrapMetal,338=ScrapArmour,339=RocketBoots,340=Riptide,341=Rifle,342=RedPhaseblade,343=RedHyperlaser,344=RainbowPhaseblade,345=RainbowMiniGun,346=RainbowKatana,347=RPG,348=Quadshooter,349=PoseidonTrident,350=Pistol,351=Phaser,352=PharaohStaff,353=PharaohBlade,354=MysteryOre,355=MysteryBox,356=MoneyChest,357=Mjolnir,358=MiniGun,359=MillitaryArmour,360=MetalShield,361=MedusaHead,362=MassacreCannon,363=MagmaSpear,364=MagmaCrossbow,365=MagicLamp,366=M4A1,367=trollhead,368=LightSword1,369=LightOrb,370=LavaLauncher,371=LaserCannon,372=Katana,373=HadesStaff,374=IronPickaxe,375=IronOre,376=InvisibleCloak,377=Inglaciator,378=speedforce,379=Incinerator,380=Illumina,381=IceStaff,382=IceHammer,383=Hyperlaser,384=BladeofMoonlight,385=HyperCannon,386=HeavyArmour,387=Harpoon,388=SprayPaint,389=GrimAxe,390=GoldenBow,391=GoldSword,392=GoldRevolver,393=GoldPickaxe,394=GoldOre,395=GoldMiniGun,396=GoldKatana,397=GoldArmour,398=GhostWalker,399=GhostBlaster,400=FrostSword,401=FrostStaff,402=FreezeRay,403=ForbiddenBox,404=Flintlock,405=FlamingMace,406=Flamethrower,407=DarkWings,408=FlameRifle,409=FlakCannon,410=Firebrand,411=FireOrb,412=FireKatana,413=FierySun,414=EpicKatana,415=EpicCrescendo,416=DreamwalkerDagger,417=DragonSlayers,418=DragonCannon,419=DoubleLaser,420=DinosaurCrossbow,421=DiamondSword,422=DiamondPickaxe,423=DiamondOre,424=DiamondMiniGun,425=DiamondArmour,426=Devestator,427=DemonScythe,428=DemonCrossbow,429=MoonKatana,430=Darkheart,431=FlameWings,432=DarkPickaxe,433=DarkOrb,434=Cutlass,435=ChaosShard4,436=Crescendo,437=CelestialSword,438=CaptainFlintlock,439=CaptainCutlass,440=ChristmasBoombox,441=ChaosMorph,442=Blunderbuss,443=BluesteelSword,444=BluesteelShotgun,445=DankPickaxe,446=BluesteelOre,447=BluesteelMiniGun,448=BluesteelArmour,449=BluePhaseblade,450=BlackholeStaff,451=BlackholeGun,452=BlackPhaseblade,453=BearMine,454=BearHead,455=BasicArmour,456=Barrett,457=ArmCannon,458=AnchorCannon,459=AmberstoneArmour,460=Amberstone,461=AmberSword,462=AmberKatana,463=AUG,464=FG13,465=AA12,466=EnchantedRoyalPistol,467=EnchantedRulerSword,468=RulerPistol,469=PureVermite,470=RulerGem,471=PinkM4A1,472=TheOne,473=RebornArmour,474=OrangeFedora,475=MidnightFedora,476=GreenFedora,477=BlackFedora,478=PurpleFedora,479=PinkFedora,480=RedFedora,481=TealFedora,482=SkyBlueFedora,483=SparkleMysteryBox,484=IngredientsPack,485=RoyalPickaxe,486=SparkletimePack,487=PinkBow,488=MaggotSlayer,489=CorruptOrb,490=TheTwo,491=TheCataclysm,492=CatCrescendo,493=TheFour,494=TheThree,495=AlmightyLight,496=AlmightyDark,497=AlmightyFire,498=AlmightySky,499=AlmightyEarth,500=AlmightyEarthSword,501=PureWater,502=PureDark,503=PureEarth,504=PureFire,505=PureSky,506=PureLight,507=EnchantedRulerArmour,508=EnchantedRulerBow,509=AlmightyFirePistol,510=EnchantedRulerScythe,511=EnchantedRulerPistol,512=AlmightyFireArmour,513=AlmightySkyBow,514=AlmightyWaterPistol,515=AlmightyWaterScythe,516=AlmightyWater,517=AlmightyLightArmour,518=NackersBow,519=AlmightyFireSword,520=OriginChaosPistol,521=AlmightyLightBow,522=AlmightySkyArmour,523=VantablackSword,524=AlmightySkyScythe,525=AlmightySkySword,526=HyperRifle,527=OriginChaosSword,528=AlmightyLightPistol,529=AlmightyLightScythe,530=MercuryMight,531=AlmightyEarthArmour,532=AlmightyEarthBow,533=AlmightyEarthPistol,534=AlmightyEarthScythe,535=AlmightyLightSword,536=AlmightyWaterBow,537=AlmightyDarkArmour,538=AlmightyDarkBow,539=AlmightyDarkPistol,540=AlmightyDarkScythe,541=AlmightyDarkSword,542=Zenith,543=RulerExcalibur,544=ElcosSword,545=AK47,546=Hurricane,547=ShadowArmour,548=RexScythe,549=Zero's Meteor,550=DealWithIts,551=ClassicFedora,552=BluesteelPickaxe,553=DankScythe,554=BlackVermiteScythe,555=greataxe,556=ChaosArmour,557=Photoflame,558=ExecutionerVoid,559=CataFist,560=ChaosWrath,561=FireCrown,562=Crystal,563=CthuhlusVengeance,564=Flameous,565=Stormbreaker,566=ChaosShard2,567=ToxicGun,568=KittyDeath,569=zephyrplush,570=ChaosEdge,571=QuantumToxico,572=GhastArmour,573=ChaosShard9,574=ChaosShard3,575=HallowTrophy,576=Huntsman,577=DivineInferno,578=ChaosShard5,579=ChaosShard6,580=DemolitionEye,581=ChaosShard7,582=DragonGodFang,583=Boombox,584=GodShield,585=SmokyCustom,586=GodArmour,587=DeathArmour,588=ElementalAlmightyArmour,589=AlmightyScythe,590=AlmightyBow,591=ElementalAlmightyPistol,592=ElementalAlmightySword,593=AlmightyArmour,594=ElementalAlmightyBow,595=AlmightyPistol,596=ElementalAlmightyScythe,597=AlmightySword,598=BlackArts,599=WhiteArts,600=ChaosShard8,601=PurpleVermiteArmour,602=RicePitchfork,603=AlmightyMysteryBox,604=RebornMysteryBox,605=PureUltimusOre,606=PureOptimumOre,607=PureMysteryOre,608=UltimatePickaxe,609=DarkSpellbook,610=OrbofTime,611=OrbofSpace,612=OriginOrb,613=thetime,614=SpectrumScythe,615=OriginArmour,616=OriginWrath,617=OriginEdge,618=OriginPhotoflame,619=OriginVoid,620=CoinGun,621=CoinMan,622=CoinCannon,623=OriginChaosBow,624=OriginChaosScythe,625=PoweredRainbowOrb,626=Azures,627=ObeliskOfTheVoid,628=UltimateHammer,629=TrueHammer,630=OmegaDeathHammer,631=NackersHammer,632=DestinyHammer,633=DeathsHammer,634=HallowExcalibur,635=HazelEye,636=GodSmasher,637=AlmightySkyPistol,638=SoulGun,639=PumpGun,640=Pumpray,641=PumpBlade,642=HallowOre,643=RetrousPistol,644=AdminTwilight,645=AzureShard,646=Azurite,647=DiscoRay,648=DiscoSword,649=GhastScythe,650=HallowedScythe,651=dragonscroll,652=Pumpkin,653=GrincherWrath,654=HallowedArmour,655=Ghastite,656=Origin,657=AzureJustice,658=Trusted (Fixing),659=DarknessGem,660=DarknessArmour,661=DarknessBow,662=DarknessPistol,663=DarknessScythe,664=VoidJugSummon,665=GreedPower,666=GreedyAura,667=fish,668=DankOnesBlade,669=Overpowered_Pillar.,670=LockOn,671=ElementalAlmightyExcalibur,672=terminalcustom,673=CosmicCorrosion,674=dankkidscythe,675=VantaExcalibur2,676=VantablackScythe,677=VantablackPistol,678=VantablackArmour,679=VantablackBow,680=ScepterOfTime,681=SuStormbreaker,682=AsgardBox,683=UruOre,684=UruBar,685=WoodStick1,686=asgard,687=thunderorb,688=ChaosShard1,689=Yamato,690=InfinityGauntlet,691=voidArmour,692=OmegaDeathBlock,693=EssenceOMEGAMAN,694=OmegaFireCrown,695=WAzureCrescendo,696=omegadeathwrath,697=OriginEdge2,698=Murasama,699=Garbage2,700=ChaosSummon,701=Cursed1,702=tanza,703=tanzscy,704=tanzgun,705=ragenask,706=BaseArmour,707=ABaseArmour,708=UBaseArmour,709=zaxe2,710=RPG2,711=RoyalPickaxe2,712=GodSmasherawo,713=UltimusEgg,714=dankkidscytheawo,715=SuperGun,716=Scary2,717=suplush,718=earthtool,719=nerfednegativeforce,720=ChaosPick,721=cthulhutool,722=SpectrumFedora,723=CorrodedRainbowOrb,724=ChaosExcalibur,725=Bone,726=piggyblade,727=TrueTsunami,728=voidrevolver,729=AzureCrescendoNew,730=SanctusExcal,731=GodOfSwordsCrown,732=EasterExcalibur,733=moefuplush,734=SpaceTimeBender,735=thevoid,736=TrophyofHardRich,737=Elementalsummon,738=VoidWraithSummon,739=OmegaSummon,740=HardGreedyAura,741=Volcanus,742=syruscustom,743=moefucustom,744=OriginChaosMask,745=RubyMask,746=voidpistol,747=spacetimemask,748=OriginChaosArmour,749=RexMask,750=ChaosEssence,751=mewishm8xmask,752=VantaExcalibur,753=darknessrevolver,754=CatastrophicMask,755=ChaosMask,756=ChickenMask,757=CthuhluMask,758=GarenMask,759=EasterMask,760=GreedMask,761=HallowedMask,762=HerculesMask,763=HolyMask,764=LazurixMask,765=HydraMask,766=LuxMask,767=MelonMask,768=OmegaChickenMask,769=OpticusMask,770=ChaosBow,771=GenesisExe,772=ChaosPistol,773=ChaosScythe,774=ChaosSword,775=catastrophicorb,776=SpectrumScytheSu,777=BladeOfEternity,778=originchaoskatana,779=DarkDemise,780=ForsakenSwordSU,781=JedaffiSword,782=SuFightingStyle,783=LuxSword,784=IzumiCustom,785=InfernalOrb,786=TideBreaker,787=InfernoOrb,788=OriginShard1,789=OriginShard2,790=OriginShard3,791=OriginShard4,792=OriginShard5,793=OriginShard6,794=OriginShard7,795=OriginShard8,796=OriginShard9,797=ChristinaSword,798=CrystalKatana,799=ThePitch,800=ZeraBeam,801=GreedPowerawo,802=CataclysmPistol,803=AzureSummon2,804=spacetime1,805=Apollyon2,806=BladeOfEternity2,807=DestructionOrigin,808=equinot,809=PrimordialLightAura,810=Apollyon,811=FlameousShard,812=testazure,813=Rampage,814=HeavenlyCommander,815=Humidity,816=Multiverse,817=CosmicSea,818=SpacetimeOrb,819=AzureOrb,820=rosswrath,821=ValenSword,822=HeartOrb,823=OmegaKatana,824=PigCrescendo,825=spectrumcannon,826=OriginChaosExcalibur,827=rossy,828=omniarmour,829=TimeArmour,830=OmegaDeathSword,831=PoweredDullOrb,832=GodMask,833=Spectrum,834=GenesisBow,835=DullBreaker,836=Dimension2,837=GenesisSummon,838=InfernoFist,839=InfernalOrb2,840=RealityBender,841=rosshammer,842=TimePiercer,843=crimsoncustom"
+local ITEM_NAMES={}
+for k,v in _N:gmatch("(%d+)=([^,]+)") do ITEM_NAMES[tonumber(k)]=v end
+
+local function getItemName(itemid)
+    return ITEM_NAMES[itemid] or ("Item #"..itemid)
+end
+
+local MI = RS:FindFirstChild("MerchantInfo")
+local MerchantRequest = MI and MI:FindFirstChild("MerchantRequest")
+local MerchantItems   = MI and MI:FindFirstChild("Items")
+
+local craftStatusCard,craftStatusStroke = makeCard(ContentCraft,4,38)
+craftStatusStroke.Color = Color3.fromRGB(80,45,10)
+local craftStatusLbl = lbl(craftStatusCard,"🛒 Waiting for merchant...",10,Color3.fromRGB(120,120,145),0,4,1,0,Enum.TextXAlignment.Center)
+craftStatusLbl.Size=UDim2.new(1,0,0,16) craftStatusLbl.Font=Enum.Font.Gotham
+local craftCountLbl = lbl(craftStatusCard,"Crafted: 0  |  Selected: 0",9,Color3.fromRGB(80,80,105),0,22,1,0,Enum.TextXAlignment.Center)
+craftCountLbl.Size=UDim2.new(1,0,0,14) craftCountLbl.Font=Enum.Font.Gotham
+
+local searchBox = Instance.new("TextBox")
+searchBox.Size=UDim2.new(1,-20,0,26) searchBox.Position=UDim2.new(0,10,0,48)
+searchBox.BackgroundColor3=Color3.fromRGB(20,20,30) searchBox.BorderSizePixel=0
+searchBox.PlaceholderText="🔍  Search items..." searchBox.Text=""
+searchBox.TextColor3=Color3.fromRGB(210,210,225) searchBox.PlaceholderColor3=Color3.fromRGB(70,70,90)
+searchBox.TextSize=11 searchBox.Font=Enum.Font.Gotham searchBox.ClearTextOnFocus=false
+searchBox.Parent=ContentCraft
+Instance.new("UICorner",searchBox).CornerRadius=UDim.new(0,6)
+Instance.new("UIStroke",searchBox).Color=Color3.fromRGB(50,50,70)
+local searchPad=Instance.new("UIPadding",searchBox)
+searchPad.PaddingLeft=UDim.new(0,8)
+
+local CRAFT_ROW=28 local CRAFT_SHOW=9
+local listFrame = Instance.new("Frame")
+listFrame.Size=UDim2.new(1,-20,0,CRAFT_SHOW*CRAFT_ROW)
+listFrame.Position=UDim2.new(0,10,0,80)
+listFrame.BackgroundColor3=Color3.fromRGB(14,14,20)
+listFrame.BorderSizePixel=0 listFrame.Parent=ContentCraft
+Instance.new("UICorner",listFrame).CornerRadius=UDim.new(0,8)
+Instance.new("UIStroke",listFrame).Color=Color3.fromRGB(45,45,60)
+
+local listSF = Instance.new("ScrollingFrame")
+listSF.Size=UDim2.new(1,0,1,0) listSF.BackgroundTransparency=1
+listSF.BorderSizePixel=0 listSF.ScrollBarThickness=4
+listSF.ScrollBarImageColor3=C_ORANGE
+listSF.ScrollingDirection=Enum.ScrollingDirection.Y
+listSF.Parent=listFrame
+
+local craftRows = {}
+local merchantStock = {}
+local craftQty = {}
+local allItems = {}
+do
+    for id, name in pairs(ITEM_NAMES) do
+        table.insert(allItems, {itemid=id, name=name})
+    end
+    table.sort(allItems, function(a,b) return a.name:lower() < b.name:lower() end)
+end
+local filteredItems = allItems  -- current filtered view
+
+local function updateSelectedCount()
+    local n=0 for _ in pairs(craftSelected) do n+=1 end
+    craftCountLbl.Text="Crafted: "..craftCount.."  |  Selected: "..n
+end
+
+local function getRowBg(isSelected, inStock)
+    if isSelected and inStock then return Color3.fromRGB(30,55,15)
+    elseif isSelected then return Color3.fromRGB(55,30,8)
+    elseif inStock then return Color3.fromRGB(16,28,16)
+    else return Color3.fromRGB(14,14,20) end
+end
+
+local function rebuildCraftList()
+    for _,r in ipairs(craftRows) do r:Destroy() end
+    craftRows={}
+    listSF.CanvasSize=UDim2.new(0,0,0,#filteredItems*CRAFT_ROW)
+    for i,item in ipairs(filteredItems) do
+        local inStock = merchantStock[item.itemid]
+        local isSelected = craftSelected[item.itemid]
+        local qty = craftQty[item.itemid] or 1
+
+        local row=Instance.new("Frame")
+        row.Size=UDim2.new(1,0,0,CRAFT_ROW-1)
+        row.Position=UDim2.new(0,0,0,(i-1)*CRAFT_ROW)
+        row.BorderSizePixel=0 row.ZIndex=2
+        row.BackgroundColor3=getRowBg(isSelected,inStock)
+        row.Parent=listSF
+        table.insert(craftRows,row)
+
+        local btn=Instance.new("TextButton")
+        btn.Size=UDim2.new(1,-46,1,0) btn.BackgroundTransparency=1
+        btn.Text="" btn.ZIndex=3 btn.Parent=row
+
+        local chk=Instance.new("TextLabel")
+        chk.Size=UDim2.new(0,20,1,0) chk.BackgroundTransparency=1
+        chk.Text=isSelected and "✓" or ""
+        chk.TextColor3=C_ORANGE chk.TextSize=13 chk.Font=Enum.Font.GothamBold
+        chk.TextXAlignment=Enum.TextXAlignment.Center chk.ZIndex=4 chk.Parent=row
+
+        local nl=Instance.new("TextLabel")
+        nl.Size=UDim2.new(1,-90,1,0) nl.Position=UDim2.new(0,22,0,0)
+        nl.BackgroundTransparency=1 nl.Text=item.name
+        if isSelected then nl.TextColor3=C_ORANGE
+        elseif inStock then nl.TextColor3=C_GREEN
+        else nl.TextColor3=Color3.fromRGB(160,160,175) end
+        nl.TextSize=10 nl.Font=Enum.Font.GothamBold
+        nl.TextXAlignment=Enum.TextXAlignment.Left
+        nl.TextTruncate=Enum.TextTruncate.AtEnd
+        nl.ZIndex=4 nl.Parent=row
+
+        if inStock then
+            local sl=Instance.new("TextLabel")
+            sl.Size=UDim2.new(0,30,1,0) sl.Position=UDim2.new(1,-78,0,0)
+            sl.BackgroundTransparency=1
+            sl.Text="x"..inStock.stock
+            sl.TextColor3=C_GREEN sl.TextSize=9 sl.Font=Enum.Font.Gotham
+            sl.TextXAlignment=Enum.TextXAlignment.Right sl.ZIndex=4 sl.Parent=row
+        end
+
+        local qtyBox=Instance.new("TextBox")
+        qtyBox.Size=UDim2.new(0,38,0,20)
+        qtyBox.Position=UDim2.new(1,-42,0.5,-10)
+        qtyBox.BackgroundColor3=isSelected and Color3.fromRGB(40,22,5) or Color3.fromRGB(22,22,32)
+        qtyBox.BorderSizePixel=0
+        qtyBox.Text=tostring(qty)
+        qtyBox.TextColor3=isSelected and C_ORANGE or Color3.fromRGB(90,90,110)
+        qtyBox.TextSize=11 qtyBox.Font=Enum.Font.GothamBold
+        qtyBox.TextXAlignment=Enum.TextXAlignment.Center
+        qtyBox.ZIndex=5 qtyBox.Parent=row
+        qtyBox.ClearTextOnFocus=false
+        Instance.new("UICorner",qtyBox).CornerRadius=UDim.new(0,4)
+        local qStroke=Instance.new("UIStroke",qtyBox)
+        qStroke.Color=isSelected and C_ORANGE or Color3.fromRGB(40,40,55)
+        qStroke.Thickness=1
+
+        local cap=item
+        local function commitQty()
+            local v=tonumber(qtyBox.Text)
+            if v and v>=1 then
+                craftQty[cap.itemid]=math.floor(v)
+                qtyBox.Text=tostring(math.floor(v))
+            else
+                qtyBox.Text=tostring(craftQty[cap.itemid] or 1)
+            end
+        end
+        qtyBox.FocusLost:Connect(commitQty)
+
+        btn.MouseButton1Click:Connect(function()
+            craftSelected[cap.itemid]=not craftSelected[cap.itemid] or nil
+            local sel=craftSelected[cap.itemid]
+            local stk=merchantStock[cap.itemid]
+            row.BackgroundColor3=getRowBg(sel,stk)
+            chk.Text=sel and "✓" or ""
+            if sel then nl.TextColor3=C_ORANGE
+            elseif stk then nl.TextColor3=C_GREEN
+            else nl.TextColor3=Color3.fromRGB(160,160,175) end
+            qtyBox.BackgroundColor3=sel and Color3.fromRGB(40,22,5) or Color3.fromRGB(22,22,32)
+            qtyBox.TextColor3=sel and C_ORANGE or Color3.fromRGB(90,90,110)
+            qStroke.Color=sel and C_ORANGE or Color3.fromRGB(40,40,55)
+            updateSelectedCount()
+        end)
+    end
+end
+
+local function applySearch(query)
+    query=query:lower():gsub("%s+","")
+    if query=="" then
+        filteredItems=allItems
+    else
+        filteredItems={}
+        for _,item in ipairs(allItems) do
+            if item.name:lower():gsub("%s+",""):find(query,1,true) then
+                table.insert(filteredItems,item)
+            end
+        end
+    end
+    rebuildCraftList()
+end
+
+searchBox:GetPropertyChangedSignal("Text"):Connect(function()
+    applySearch(searchBox.Text)
+end)
+
+rebuildCraftList()
+local craftInfoLbl = lbl(ContentCraft,"",10,Color3.fromRGB(80,80,100),10,62,1,-20,Enum.TextXAlignment.Left)
+craftInfoLbl.Size=UDim2.new(0,0,0,0) -- hidden, kept for compat
+
+local function parseMerchantItems(raw)
+    if not raw or raw=="" or raw=="[]" then return {} end
+    local items={}
+    for block in raw:gmatch("{([^{}]+)}") do
+        local itemid=tonumber(block:match('"itemid":(%d+)'))
+        local cost=tonumber(block:match('"cost":(%d+)'))
+        local stock=tonumber(block:match('"stock":(%d+)'))
+        local qty=tonumber(block:match('"quantity":(%d+)'))
+        if itemid and stock and stock>0 then
+            local ingredients={}
+            for ingid,ingqty in block:gmatch('"itemid":(%d+),"quantity":(%d+)') do
+                local id=tonumber(ingid)
+                if id~=itemid then
+                    table.insert(ingredients,{itemid=id,quantity=tonumber(ingqty)})
+                end
+            end
+            table.insert(items,{
+                itemid=itemid, name=getItemName(itemid),
+                cost=cost or 0, stock=stock, qty=qty or 1,
+                ingredients=ingredients
+            })
+        end
+    end
+    return items
+end
+
+local function loadMerchantItems()
+    if not MerchantItems then return end
+    merchantItems=parseMerchantItems(MerchantItems.Value)
+    merchantStock={}
+    for _,item in ipairs(merchantItems) do
+        merchantStock[item.itemid]={stock=item.stock,cost=item.cost,ingredients=item.ingredients,qty=item.qty}
+    end
+    rebuildCraftList()
+    if #merchantItems>0 then
+        craftStatusLbl.Text="🛒 Merchant: "..#merchantItems.." items available!"
+        craftStatusLbl.TextColor3=C_GREEN
+    else
+        craftStatusLbl.Text="🛒 Waiting for merchant..."
+        craftStatusLbl.TextColor3=Color3.fromRGB(120,120,145)
+    end
+end
+
+if MerchantItems and MerchantItems.Value~="" and MerchantItems.Value~="[]" then
+    loadMerchantItems()
+end
+
+local CraftBtn,CraftStroke=makeBtn(ContentCraft,nil,"▶  START AUTO CRAFT",C_ORANGE,Color3.fromRGB(55,25,5))
+CraftBtn.Position=UDim2.new(0,10,1,-44)
+CraftStroke.Color=C_ORANGE
+
+local function tryBuyItem(item)
+    if not MerchantRequest then
+        craftStatusLbl.Text="❌ MerchantRequest not found!" craftStatusLbl.TextColor3=C_RED
+        return false
+    end
+    local sigs={
+        {label="buy,id",     fn=function() return MerchantRequest:InvokeServer("buy",item.itemid) end},
+        {label="purchase,id",fn=function() return MerchantRequest:InvokeServer("purchase",item.itemid) end},
+        {label="craft,id",   fn=function() return MerchantRequest:InvokeServer("craft",item.itemid) end},
+        {label="id only",    fn=function() return MerchantRequest:InvokeServer(item.itemid) end},
+        {label="buy,id,qty", fn=function() return MerchantRequest:InvokeServer("buy",item.itemid,item.qty) end},
+        {label="id,qty",     fn=function() return MerchantRequest:InvokeServer(item.itemid,item.qty) end},
+        {label="buy,id,1",   fn=function() return MerchantRequest:InvokeServer("buy",item.itemid,1) end},
+        {label="table",      fn=function() return MerchantRequest:InvokeServer({itemid=item.itemid,quantity=item.qty}) end},
+    }
+    for _,sig in ipairs(sigs) do
+        local ok,r=pcall(sig.fn)
+        print("[CW Craft] sig=["..sig.label.."] ok="..tostring(ok).." result="..tostring(r))
+        if ok and r~=nil and r~=false then
+            print("[CW Craft] ✅ Working sig: "..sig.label)
+            return true
+        end
+    end
+    print("[CW Craft] ❌ All sigs failed for itemid="..tostring(item.itemid))
+    return false
+end
+
+local function runAutoCraft()
+    local n=0 for _ in pairs(craftSelected) do n+=1 end
+    if n==0 then craftStatusLbl.Text="⚠ Select items first" craftStatusLbl.TextColor3=C_GOLD return end
+    local bought=0
+    for itemid,_ in pairs(craftSelected) do
+        if not craftEnabled then break end
+        local stk=merchantStock[itemid]
+        if not stk or stk.stock<=0 then continue end
+        local name=getItemName(itemid)
+        local wantQty=craftQty[itemid] or 1
+        local canBuy=math.min(wantQty, stk.stock)
+        local item={itemid=itemid,name=name,cost=stk.cost,stock=stk.stock,qty=stk.qty or 1,ingredients=stk.ingredients or {}}
+        for q=1,canBuy do
+            if not craftEnabled then break end
+            craftStatusLbl.Text="🔨 "..name.." ("..q.."/"..canBuy..")" craftStatusLbl.TextColor3=C_ORANGE
+            local ok=tryBuyItem(item)
+            if ok then
+                craftCount+=1 bought+=1 updateSelectedCount()
+                craftStatusLbl.Text="✅ "..name.." "..q.."/"..canBuy craftStatusLbl.TextColor3=C_GREEN
+            else
+                break -- stop if purchase fails
+            end
+            task.wait(0.4)
+        end
+    end
+    if bought>0 then
+        craftStatusLbl.Text="✅ Bought "..bought.." total! Watching..." craftStatusLbl.TextColor3=C_GREEN
+    else
+        craftStatusLbl.Text="⏳ None ready - watching for merchant..." craftStatusLbl.TextColor3=C_GOLD
+    end
+end
+
+local craftChangedConn = nil
+
+local function onMerchantArrived()
+    if not craftEnabled then return end
+    local raw = MerchantItems and MerchantItems.Value or ""
+    if raw=="" or raw=="[]" then
+        merchantStock={}
+        rebuildCraftList()
+        craftStatusLbl.Text="🔴 Armed - waiting for merchant..."
+        craftStatusLbl.TextColor3=C_GOLD
+        return
+    end
+    loadMerchantItems()
+    local hasMatch=false
+    for itemid,_ in pairs(craftSelected) do
+        if merchantStock[itemid] then hasMatch=true break end
+    end
+    if not hasMatch then
+        craftStatusLbl.Text="🟡 Merchant here - none of your picks available"
+        craftStatusLbl.TextColor3=C_GOLD
+        return
+    end
+    craftStatusLbl.Text="🛒 Merchant arrived! Crafting..."
+    craftStatusLbl.TextColor3=C_GREEN
+    task.wait(0.3)
+    if craftEnabled then runAutoCraft() end
+    if craftEnabled then
+        craftStatusLbl.Text="🔴 Armed - waiting for next merchant..."
+        craftStatusLbl.TextColor3=C_GOLD
+    end
+end
+
+local function startCraftLoop()
+    if craftLooping then return end
+    craftLooping=true
+
+    craftStatusLbl.Text="🔴 Armed - waiting for merchant..."
+    craftStatusLbl.TextColor3=C_GOLD
+
+    if craftChangedConn then craftChangedConn:Disconnect() craftChangedConn=nil end
+
+    if MerchantItems then
+        craftChangedConn = MerchantItems.Changed:Connect(function()
+            if craftEnabled then
+                task.spawn(onMerchantArrived)
+            end
+        end)
+    end
+
+    task.spawn(function()
+        if MerchantItems and MerchantItems.Value~="" and MerchantItems.Value~="[]" then
+            task.spawn(onMerchantArrived)
+        end
+
+        local lastHash = MerchantItems and MerchantItems.Value or ""
+        while craftEnabled do
+            task.wait(2)
+            if not craftEnabled then break end
+            if MerchantItems then
+                local raw=MerchantItems.Value
+                if raw~=lastHash then
+                    lastHash=raw
+                    task.spawn(onMerchantArrived)
+                end
+            end
+        end
+
+        craftLooping=false
+        if craftChangedConn then craftChangedConn:Disconnect() craftChangedConn=nil end
+        craftStatusLbl.Text="⬜ Auto Craft: OFF" craftStatusLbl.TextColor3=Color3.fromRGB(120,120,145)
+    end)
+end
+
+CraftBtn.MouseButton1Click:Connect(function()
+    craftEnabled=not craftEnabled
+    if craftEnabled then
+        local n=0 for _ in pairs(craftSelected) do n+=1 end
+        if n==0 then
+            craftEnabled=false
+            craftStatusLbl.Text="⚠ Select items first!"
+            craftStatusLbl.TextColor3=C_RED
+            return
+        end
+        CraftBtn.Text="■  STOP AUTO CRAFT" CraftBtn.TextColor3=C_RED
+        CraftBtn.BackgroundColor3=Color3.fromRGB(50,16,16) CraftStroke.Color=C_RED
+        startCraftLoop()
+    else
+        CraftBtn.Text="▶  START AUTO CRAFT" CraftBtn.TextColor3=C_ORANGE
+        CraftBtn.BackgroundColor3=Color3.fromRGB(55,25,5) CraftStroke.Color=C_ORANGE
+        if craftChangedConn then craftChangedConn:Disconnect() craftChangedConn=nil end
+        craftStatusLbl.Text="⬜ Auto Craft: OFF" craftStatusLbl.TextColor3=Color3.fromRGB(120,120,145)
+    end
+end)
+
+print("[CW Auto] Loaded!")
