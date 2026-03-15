@@ -5,8 +5,8 @@ local LP = Players.LocalPlayer
 
 local MINE_INTERVAL = 1
 local HITS_PER_ORE  = 10000
-local PICKAXE_NAME  = "Unobtanium Pickaxe"
-local WEAPON_NAME   = "Greataxe of Annihilation"
+local PICKAXE_NAME  = "Chaos Pickaxe"
+local WEAPON_NAME   = "Transcendent Breaker"
 local KILL_INTERVAL = 0.01
 local KILL_HITS     = 1000000000
 local KILL_RANGE    = 9999
@@ -65,7 +65,7 @@ local BIOME_LIST = {
     {id=34,name="Biome 34",rank=4000},{id=35,name="Biome 35",rank=1600},
     {id=36,name="Biome 36",rank=1000},{id=37,name="Biome 37",rank=12000},
     {id=38,name="Biome 38",rank=25000},{id=39,name="Biome 39",rank=10000},
-    {id=40,name="Biome 40",rank=30000},
+    {id=40,name="Biome 40",rank=30000},{id=41,name="Biome 41",rank=2000},
 }
 
 local ORE_SET = {}
