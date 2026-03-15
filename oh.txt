@@ -14,43 +14,34 @@ local VERBOSUS_WAIT = 13
 local VERBOSUS_NAME = "Verbosus, Ruler of Space"
 local MINE_FOLDERS  = {Mine1="Mine", Mine2="Mine2", Mine3="Mine3"}
 
--- CRAFT WHITELIST: item IDs that will be AUTO-SELECTED in the craft tab
--- IDs confirmed correct by matching Items:GetChildren() index to merchant itemid
+-- CRAFT WHITELIST: confirmed real IDs from merchant JSON + UI matching
 local CRAFT_WHITELIST = {
-    -- Ores
-    [88]=true,   -- Divumite
-    [40]=true,   -- Rolite
-    [75]=true,   -- Dankite
-    [69]=true,   -- Regite
-    [460]=true,  -- Amberstone
-    [251]=true,  -- Optimum
-    [277]=true,  -- UltimusOre
-    [12]=true,   -- Plutonium
-    [68]=true,   -- Uranium
-    -- Chaos Shards
-    [688]=true,  -- ChaosShard1
-    [566]=true,  -- ChaosShard2
-    [574]=true,  -- ChaosShard3
-    [435]=true,  -- ChaosShard4
-    [578]=true,  -- ChaosShard5
-    [579]=true,  -- ChaosShard6
-    [581]=true,  -- ChaosShard7
-    [600]=true,  -- ChaosShard8
-    [573]=true,  -- ChaosShard9
-    -- Materials
-    [470]=true,  -- RulerGem
-    [163]=true,  -- ShardoftheUniverse
-    [659]=true,  -- DarknessGem
-    -- Rare Items
-    [620]=true,  -- CoinGun (Greed's Judgement ingredient)
-    [730]=true,  -- SanctusExcal
-    [841]=true,  -- rosshammer (Ross' Divine Hammer)
-    [680]=true,  -- ScepterOfTime (Chronos' Verdict)
-    [817]=true,  -- CosmicSea (Oceanus)
-    [840]=true,  -- RealityBender (Creation Bender)
-    [569]=true,  -- zephyrplush (Gear's Plushie)
-    [717]=true,  -- suplush (Poisonlord65's Plushie)
-    [733]=true,  -- moefuplush (Chiwawa897's Plushie)
+    -- Ores (confirmed)
+    [109]=true,  -- Amberstone
+    [147]=true,  -- Vermite Ore
+    [184]=true,  -- Ultimus Ore
+    [203]=true,  -- Optimum Ore
+    [365]=true,  -- Divumite
+    [382]=true,  -- Dankite
+    [386]=true,  -- Rolite
+    [388]=true,  -- Uranium
+    [417]=true,  -- Plutonium
+    -- Chaos Shards (confirmed)
+    [574]=true,  -- Chaos Shard 1
+    [575]=true,  -- Chaos Shard 2
+    [576]=true,  -- Chaos Shard 3
+    [583]=true,  -- Chaos Shard 4
+    [590]=true,  -- Chaos Shard 6
+    [591]=true,  -- Chaos Shard 7
+    [611]=true,  -- Chaos Shard 9
+    -- Materials (confirmed)
+    [291]=true,  -- Shard of the Universe
+    -- Rare Items (confirmed)
+    [790]=true,  -- Gear's Plushie
+    [792]=true,  -- Chiwawa897's Plushie
+    -- Not yet seen in merchant (will add when confirmed):
+    -- Chaos Shard 5, Chaos Shard 8, RulerGem, DarknessGem
+    -- SanctusExcal, rosshammer, Poisonlord65's Plushie
 }
 
 local BIOME_LIST = {
@@ -1198,32 +1189,17 @@ local CraftBtn,CraftStroke=makeBtn(ContentCraft,nil,"▶ START CRAFT",C_ORANGE,C
 CraftBtn.Position=UDim2.new(0,10,1,-44)
 CraftStroke.Color=C_ORANGE
 
--- FIXED: Use the correct invoke format discovered from source (just the item ID)
+-- buyItem: result=true means server accepted the purchase
 local function tryBuyItem(item)
     if not MerchantRequest then
         craftStatusLbl.Text="❌ MerchantRequest not found!" craftStatusLbl.TextColor3=C_RED
         return false
     end
-    -- Primary method: just the item ID (confirmed working from your source)
-    local ok, r = pcall(function()
+    local ok, result = pcall(function()
         return MerchantRequest:InvokeServer(item.itemid)
     end)
-    print("[CW Craft] itemid="..tostring(item.itemid).." ok="..tostring(ok).." result="..tostring(r))
-    if ok then return true end
-
-    -- Fallback methods
-    local fallbacks = {
-        function() return MerchantRequest:InvokeServer("buy", item.itemid) end,
-        function() return MerchantRequest:InvokeServer("craft", item.itemid) end,
-        function() return MerchantRequest:InvokeServer(item.itemid, 1) end,
-    }
-    for _, fn in ipairs(fallbacks) do
-        local ok2, r2 = pcall(fn)
-        if ok2 then
-            print("[CW Craft] fallback worked, result="..tostring(r2))
-            return true
-        end
-    end
+    print("[CW Craft] itemid="..tostring(item.itemid).." ok="..tostring(ok).." result="..tostring(result))
+    if ok and result == true then return true end
     return false
 end
 
