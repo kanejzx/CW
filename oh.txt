@@ -718,9 +718,16 @@ local function startKillLoop()
                     if mh and (mh.Position-myPos).Magnitude>KILL_RANGE then continue end
                 end
                 local wp2=(ch:FindFirstChild(WEAPON_NAME)) or (bp and bp:FindFirstChild(WEAPON_NAME))
-                local r=wp2 and wp2:FindFirstChild("RemoteFunction")
-                if not r then break end
-                pcall(function() r:InvokeServer(unpack({"hit",{obj,KILL_HITS}})) end)
+                if not wp2 then break end
+                local m1 = wp2:FindFirstChild("M1Event")
+                local rf = wp2:FindFirstChild("RemoteFunction")
+                if m1 then
+                    pcall(function() m1:FireServer() end)
+                elseif rf then
+                    pcall(function() rf:InvokeServer(unpack({"hit",{obj,KILL_HITS}})) end)
+                else
+                    break
+                end
                 killCount+=1
                 KillCountLbl.Text="Mobs hit: "..killCount
                 KillStatusLbl.Text="⚔ "..(obj.Parent and obj.Parent.Name or "?")
