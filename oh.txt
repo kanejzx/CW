@@ -14,35 +14,6 @@ local VERBOSUS_WAIT = 13
 local VERBOSUS_NAME = "Verbosus, Ruler of Space"
 local MINE_FOLDERS  = {Mine1="Mine", Mine2="Mine2", Mine3="Mine3"}
 
--- CRAFT WHITELIST: confirmed real IDs from merchant JSON + UI matching
-local CRAFT_WHITELIST = {
-    -- Ores (confirmed)
-    [109]=true,  -- Amberstone
-    [147]=true,  -- Vermite Ore
-    [184]=true,  -- Ultimus Ore
-    [203]=true,  -- Optimum Ore
-    [365]=true,  -- Divumite
-    [382]=true,  -- Dankite
-    [386]=true,  -- Rolite
-    [388]=true,  -- Uranium
-    [417]=true,  -- Plutonium
-    -- Chaos Shards (confirmed)
-    [574]=true,  -- Chaos Shard 1
-    [575]=true,  -- Chaos Shard 2
-    [576]=true,  -- Chaos Shard 3
-    [583]=true,  -- Chaos Shard 4
-    [590]=true,  -- Chaos Shard 6
-    [591]=true,  -- Chaos Shard 7
-    [611]=true,  -- Chaos Shard 9
-    -- Materials (confirmed)
-    [291]=true,  -- Shard of the Universe
-    -- Rare Items (confirmed)
-    [790]=true,  -- Gear's Plushie
-    [792]=true,  -- Chiwawa897's Plushie
-    -- Not yet seen in merchant (will add when confirmed):
-    -- Chaos Shard 5, Chaos Shard 8, RulerGem, DarknessGem
-    -- SanctusExcal, rosshammer, Poisonlord65's Plushie
-}
 
 local BIOME_LIST = {
     {id=0,name="Default",rank=1},{id=1,name="Biome 1",rank=100},
@@ -65,7 +36,7 @@ local BIOME_LIST = {
     {id=34,name="Biome 34",rank=4000},{id=35,name="Biome 35",rank=1600},
     {id=36,name="Biome 36",rank=1000},{id=37,name="Biome 37",rank=12000},
     {id=38,name="Biome 38",rank=25000},{id=39,name="Biome 39",rank=10000},
-    {id=40,name="Biome 40",rank=30000},{id=41,name="Biome 41",rank=2000},
+    {id=40,name="Biome 40",rank=30000},
 }
 
 local ORE_SET = {}
@@ -1161,13 +1132,7 @@ local function loadMerchantItems()
 
     -- AUTO SELECT whitelisted items that are in stock
     craftSelected = {}
-    for _, item in ipairs(merchantItems) do
-        if CRAFT_WHITELIST[item.itemid] then
-            craftSelected[item.itemid] = true
-        end
-    end
-
-    rebuildCraftList()
+    f   rebuildCraftList()
     updateSelectedCount()
 
     if #merchantItems>0 then
@@ -1189,17 +1154,32 @@ local CraftBtn,CraftStroke=makeBtn(ContentCraft,nil,"▶ START CRAFT",C_ORANGE,C
 CraftBtn.Position=UDim2.new(0,10,1,-44)
 CraftStroke.Color=C_ORANGE
 
--- buyItem: result=true means server accepted the purchase
+-- FIXED: Use the correct invoke format discovered from source (just the item ID)
 local function tryBuyItem(item)
     if not MerchantRequest then
         craftStatusLbl.Text="❌ MerchantRequest not found!" craftStatusLbl.TextColor3=C_RED
         return false
     end
-    local ok, result = pcall(function()
+    -- Primary method: just the item ID (confirmed working from your source)
+    local ok, r = pcall(function()
         return MerchantRequest:InvokeServer(item.itemid)
     end)
-    print("[CW Craft] itemid="..tostring(item.itemid).." ok="..tostring(ok).." result="..tostring(result))
-    if ok and result == true then return true end
+    print("[CW Craft] itemid="..tostring(item.itemid).." ok="..tostring(ok).." result="..tostring(r))
+    if ok then return true end
+
+    -- Fallback methods
+    local fallbacks = {
+        function() return MerchantRequest:InvokeServer("buy", item.itemid) end,
+        function() return MerchantRequest:InvokeServer("craft", item.itemid) end,
+        function() return MerchantRequest:InvokeServer(item.itemid, 1) end,
+    }
+    for _, fn in ipairs(fallbacks) do
+        local ok2, r2 = pcall(fn)
+        if ok2 then
+            print("[CW Craft] fallback worked, result="..tostring(r2))
+            return true
+        end
+    end
     return false
 end
 
@@ -1259,20 +1239,9 @@ local function startCraftLoop()
                     for itemid,_ in pairs(craftSelected) do
                         if merchantStock[itemid] then hasMatch=true break end
                     end
-                    if hasMatch then
-                        craftStatusLbl.Text="🛒 Whitelisted items found! Crafting..."
-                        craftStatusLbl.TextColor3=C_GREEN
-                        task.wait(0.3)
-                        if craftEnabled then runAutoCraft() end
-                        if craftEnabled then
-                            craftStatusLbl.Text="🔴 Waiting for next merchant..."
-                            craftStatusLbl.TextColor3=C_GOLD
-                        end
-                    else
-                        local stkCount=0 for _ in pairs(merchantStock) do stkCount+=1 end
-                        craftStatusLbl.Text="Merchant: "..stkCount.." items | No whitelist match"
-                        craftStatusLbl.TextColor3=C_GOLD
-                    end
+                    local stkCount=0 for _ in pairs(merchantStock) do stkCount+=1 end
+                    craftStatusLbl.Text="🛒 Merchant: "..stkCount.." items | Select and craft manually"
+                    craftStatusLbl.TextColor3=C_GREEN
                     craftProcessing=false
                 elseif raw=="" or raw=="[]" then
                     merchantStock={}
