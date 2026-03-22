@@ -1,0 +1,494 @@
+local Players = game:GetService("Players")
+local RS = game:GetService("ReplicatedStorage")
+local UIS = game:GetService("UserInputService")
+local LP = Players.LocalPlayer
+
+local Remotes = RS:WaitForChild("Assets"):WaitForChild("Remotes")
+local SKill = Remotes.Skills:WaitForChild("SKill")
+local ReportHits = Remotes.Skills:WaitForChild("ReportHits")
+local LootClaim = Remotes.LootDrop:WaitForChild("Claim")
+local LootDropped = Remotes.LootDrop:WaitForChild("Dropped")
+local RebirthRemote = Remotes.Tycoon:WaitForChild("Rebirth")
+
+local CHARACTER = "Yuji"
+local ATTACK_INTERVAL = 0.1
+local autoKill,autoKillLoop = false,false
+local autoClaim,autoClaimLoop = false,false
+local autoUpgrade,autoUpgradeLoop = false,false
+local autoRebirth = false
+local killCount,claimCount,upgradeCount = 0,0,0
+local drops = {}
+
+LootDropped.OnClientEvent:Connect(function(id) if id then drops[tostring(id)]=true end end)
+Remotes.LootDrop:WaitForChild("Claimed").OnClientEvent:Connect(function(id) if id then drops[tostring(id)]=nil end end)
+
+local C_BG=Color3.fromRGB(10,10,15)
+local C_TITLE=Color3.fromRGB(15,15,22)
+local C_CARD=Color3.fromRGB(18,18,26)
+local C_GREEN=Color3.fromRGB(75,215,115)
+local C_RED=Color3.fromRGB(255,80,80)
+local C_BLUE=Color3.fromRGB(80,180,255)
+local C_GOLD=Color3.fromRGB(255,185,55)
+local C_DIM=Color3.fromRGB(160,160,175)
+local C_PURPLE=Color3.fromRGB(195,80,255)
+local C_ORANGE=Color3.fromRGB(255,140,40)
+
+local old=LP.PlayerGui:FindFirstChild("SorcererHub")
+if old then old:Destroy() end
+
+local SG=Instance.new("ScreenGui")
+SG.Name="SorcererHub" SG.ResetOnSpawn=false
+SG.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
+SG.IgnoreGuiInset=true SG.Parent=LP.PlayerGui
+
+local Win=Instance.new("Frame")
+Win.Size=UDim2.new(0,300,0,450) Win.Position=UDim2.new(0,60,0,60)
+Win.BackgroundColor3=C_BG Win.BorderSizePixel=0 Win.Parent=SG
+Instance.new("UICorner",Win).CornerRadius=UDim.new(0,12)
+local WinStroke=Instance.new("UIStroke",Win)
+WinStroke.Color=C_PURPLE WinStroke.Thickness=1.5
+
+local TBar=Instance.new("Frame")
+TBar.Size=UDim2.new(1,0,0,46) TBar.BackgroundColor3=C_TITLE
+TBar.BorderSizePixel=0 TBar.ZIndex=2 TBar.Parent=Win
+Instance.new("UICorner",TBar).CornerRadius=UDim.new(0,12)
+local TFix=Instance.new("Frame")
+TFix.Size=UDim2.new(1,0,0,12) TFix.Position=UDim2.new(0,0,1,-12)
+TFix.BackgroundColor3=C_TITLE TFix.BorderSizePixel=0 TFix.ZIndex=2 TFix.Parent=TBar
+
+local TitleLbl=Instance.new("TextLabel")
+TitleLbl.Size=UDim2.new(1,-50,1,0) TitleLbl.Position=UDim2.new(0,14,0,0)
+TitleLbl.BackgroundTransparency=1 TitleLbl.Text="⚡  SORCERER HUB"
+TitleLbl.TextColor3=C_PURPLE TitleLbl.TextSize=14
+TitleLbl.Font=Enum.Font.GothamBold TitleLbl.TextXAlignment=Enum.TextXAlignment.Left
+TitleLbl.ZIndex=3 TitleLbl.Parent=TBar
+
+local MinBtn=Instance.new("TextButton")
+MinBtn.Size=UDim2.new(0,28,0,28) MinBtn.Position=UDim2.new(1,-38,0,9)
+MinBtn.BackgroundColor3=Color3.fromRGB(32,32,44) MinBtn.Text="-"
+MinBtn.TextColor3=C_DIM MinBtn.TextSize=14 MinBtn.Font=Enum.Font.GothamBold
+MinBtn.BorderSizePixel=0 MinBtn.ZIndex=10 MinBtn.Parent=Win
+Instance.new("UICorner",MinBtn).CornerRadius=UDim.new(0,6)
+
+local dragActive=false local dragX,dragY=0,0
+TBar.InputBegan:Connect(function(i)
+    if i.UserInputType==Enum.UserInputType.MouseButton1 then
+        dragActive=true dragX=i.Position.X-Win.Position.X.Offset dragY=i.Position.Y-Win.Position.Y.Offset
+    end
+end)
+UIS.InputChanged:Connect(function(i)
+    if dragActive and i.UserInputType==Enum.UserInputType.MouseMovement then
+        Win.Position=UDim2.new(0,i.Position.X-dragX,0,i.Position.Y-dragY)
+    end
+end)
+UIS.InputEnded:Connect(function(i)
+    if i.UserInputType==Enum.UserInputType.MouseButton1 then dragActive=false end
+end)
+
+local Body=Instance.new("Frame")
+Body.Size=UDim2.new(1,0,1,-46) Body.Position=UDim2.new(0,0,0,46)
+Body.BackgroundTransparency=1 Body.Parent=Win
+
+local minimized=false
+MinBtn.MouseButton1Click:Connect(function()
+    minimized=not minimized Body.Visible=not minimized
+    Win.Size=minimized and UDim2.new(0,300,0,46) or UDim2.new(0,300,0,450)
+    MinBtn.Text=minimized and "+" or "-"
+end)
+
+local TabBar=Instance.new("Frame")
+TabBar.Size=UDim2.new(1,-20,0,32) TabBar.Position=UDim2.new(0,10,0,8)
+TabBar.BackgroundColor3=Color3.fromRGB(18,18,26) TabBar.BorderSizePixel=0 TabBar.Parent=Body
+Instance.new("UICorner",TabBar).CornerRadius=UDim.new(0,8)
+
+local function mkTab(txt,xoff,xsz)
+    local b=Instance.new("TextButton")
+    b.Size=UDim2.new(xsz,-4,1,-6) b.Position=UDim2.new(xoff,3,0,3)
+    b.BackgroundColor3=Color3.fromRGB(28,28,40) b.Text=txt b.TextColor3=C_DIM
+    b.TextSize=9 b.Font=Enum.Font.GothamBold b.BorderSizePixel=0 b.Parent=TabBar
+    Instance.new("UICorner",b).CornerRadius=UDim.new(0,6)
+    return b
+end
+
+local TabKill=mkTab("⚔ KILL",0,1/5)
+local TabDrop=mkTab("💰 DROP",1/5,1/5)
+local TabTyc=mkTab("🏠 TYCO",2/5,1/5)
+local TabShop=mkTab("🛒 SHOP",3/5,1/5)
+local TabChar=mkTab("👤 CHAR",4/5,1/5)
+
+local function mkContent()
+    local f=Instance.new("Frame")
+    f.Size=UDim2.new(1,0,1,-50) f.Position=UDim2.new(0,0,0,50)
+    f.BackgroundTransparency=1 f.Visible=false f.Parent=Body
+    return f
+end
+
+local CKill=mkContent() local CDrop=mkContent()
+local CTyc=mkContent() local CShop=mkContent()
+local CChar=mkContent()
+CKill.Visible=true
+
+local function mkCard(p,y,h)
+    local f=Instance.new("Frame")
+    f.Size=UDim2.new(1,-20,0,h) f.Position=UDim2.new(0,10,0,y)
+    f.BackgroundColor3=C_CARD f.BorderSizePixel=0 f.Parent=p
+    Instance.new("UICorner",f).CornerRadius=UDim.new(0,8)
+    local s=Instance.new("UIStroke",f) s.Color=Color3.fromRGB(38,38,52) s.Thickness=1
+    return f,s
+end
+
+local function mkLbl(p,txt,sz,col,x,y,w,h,ax)
+    local l=Instance.new("TextLabel")
+    l.Text=txt l.TextSize=sz l.TextColor3=col l.Font=Enum.Font.GothamBold
+    l.BackgroundTransparency=1 l.Size=UDim2.new(w,0,0,h) l.Position=UDim2.new(0,x,0,y)
+    l.TextXAlignment=ax or Enum.TextXAlignment.Left l.Parent=p
+    return l
+end
+
+local function mkBtn(p,y,txt,tc,bg)
+    local b=Instance.new("TextButton")
+    b.Size=UDim2.new(1,-20,0,34) b.Position=UDim2.new(0,10,0,y)
+    b.BackgroundColor3=bg b.Text=txt b.TextColor3=tc
+    b.TextSize=12 b.Font=Enum.Font.GothamBold b.BorderSizePixel=0 b.Parent=p
+    Instance.new("UICorner",b).CornerRadius=UDim.new(0,8)
+    local s=Instance.new("UIStroke",b) s.Color=tc s.Thickness=1.2
+    return b,s
+end
+
+local tabCols={kill=C_RED,drop=C_GOLD,tyc=C_GREEN,shop=C_ORANGE,char=C_BLUE}
+local tabBgs={kill=Color3.fromRGB(55,15,15),drop=Color3.fromRGB(55,40,5),tyc=Color3.fromRGB(15,50,25),shop=Color3.fromRGB(55,30,5),char=Color3.fromRGB(15,35,55)}
+
+local function setTab(t)
+    CKill.Visible=t=="kill" CDrop.Visible=t=="drop"
+    CTyc.Visible=t=="tyc" CShop.Visible=t=="shop" CChar.Visible=t=="char"
+    local tabs={kill=TabKill,drop=TabDrop,tyc=TabTyc,shop=TabShop,char=TabChar}
+    for k,btn in pairs(tabs) do
+        if k==t then btn.BackgroundColor3=tabBgs[k] btn.TextColor3=tabCols[k] WinStroke.Color=tabCols[k]
+        else btn.BackgroundColor3=Color3.fromRGB(28,28,40) btn.TextColor3=C_DIM end
+    end
+end
+TabKill.MouseButton1Click:Connect(function() setTab("kill") end)
+TabDrop.MouseButton1Click:Connect(function() setTab("drop") end)
+TabTyc.MouseButton1Click:Connect(function() setTab("tyc") end)
+TabShop.MouseButton1Click:Connect(function() setTab("shop") end)
+TabChar.MouseButton1Click:Connect(function() setTab("char") end)
+setTab("kill")
+
+-- COMBAT TAB
+local kCard,kStroke=mkCard(CKill,4,88)
+mkLbl(kCard,"⚔ AUTO KILL",13,Color3.fromRGB(215,215,228),0,8,1,0,Enum.TextXAlignment.Center).Size=UDim2.new(1,0,0,20)
+local kStatus=mkLbl(kCard,"Status: Idle",10,C_DIM,0,30,1,0,Enum.TextXAlignment.Center)
+kStatus.Size=UDim2.new(1,0,0,16) kStatus.Font=Enum.Font.Gotham
+local kCount=mkLbl(kCard,"Hits: 0",10,Color3.fromRGB(80,80,105),0,48,1,0,Enum.TextXAlignment.Center)
+kCount.Size=UDim2.new(1,0,0,14) kCount.Font=Enum.Font.Gotham
+local kTarget=mkLbl(kCard,"Target: none",9,Color3.fromRGB(70,70,95),0,64,1,0,Enum.TextXAlignment.Center)
+kTarget.Size=UDim2.new(1,0,0,14) kTarget.Font=Enum.Font.Gotham
+
+local spd,_=mkCard(CKill,100,34)
+mkLbl(spd,"Speed(s):",10,C_DIM,10,0,0.45,0,Enum.TextXAlignment.Left).Size=UDim2.new(0.45,0,1,0)
+local spdBox=Instance.new("TextBox")
+spdBox.Size=UDim2.new(0.4,0,0,22) spdBox.Position=UDim2.new(0.48,0,0.5,-11)
+spdBox.BackgroundColor3=Color3.fromRGB(22,22,32) spdBox.Text="0.1"
+spdBox.TextColor3=C_RED spdBox.TextSize=11 spdBox.Font=Enum.Font.GothamBold
+spdBox.BorderSizePixel=0 spdBox.ClearTextOnFocus=false spdBox.Parent=spd
+Instance.new("UICorner",spdBox).CornerRadius=UDim.new(0,5)
+Instance.new("UIStroke",spdBox).Color=C_RED
+spdBox.FocusLost:Connect(function()
+    local v=tonumber(spdBox.Text)
+    if v and v>0 then ATTACK_INTERVAL=v else spdBox.Text=tostring(ATTACK_INTERVAL) end
+end)
+
+local KillBtn,KillBtnS=mkBtn(CKill,142,"▶  START AUTO KILL",C_GREEN,Color3.fromRGB(18,50,28))
+
+local function getEnemies()
+    local e={}
+    for _,obj in ipairs(workspace:GetDescendants()) do
+        local hum=obj:FindFirstChildOfClass("Humanoid")
+        if hum and hum.Health>0 then
+            local isP=false
+            for _,p in ipairs(Players:GetPlayers()) do
+                if p.Character==obj then isP=true break end
+            end
+            if not isP then table.insert(e,obj) end
+        end
+    end
+    return e
+end
+
+local function startKill()
+    if autoKillLoop then return end
+    autoKillLoop=true
+    task.spawn(function()
+        while autoKill do
+            local enemies=getEnemies()
+            if #enemies==0 then
+                kStatus.Text="⏳ No enemies..." kStatus.TextColor3=C_GOLD
+                task.wait(1)
+            else
+                for _,enemy in ipairs(enemies) do
+                    if not autoKill then break end
+                    local hum=enemy:FindFirstChildOfClass("Humanoid")
+                    if not hum or hum.Health<=0 then continue end
+                    kTarget.Text="Target: "..enemy.Name
+                    kStatus.Text="⚔ Attacking..." kStatus.TextColor3=C_RED
+                    pcall(function() SKill:FireServer(CHARACTER,"M1_1") end)
+                    pcall(function()
+                        local id=tostring(math.random(100000,999999)).."_hit1"
+                        ReportHits:FireServer(id,{{characterName=enemy.Name}})
+                    end)
+                    killCount+=1 kCount.Text="Hits: "..killCount
+                    task.wait(ATTACK_INTERVAL)
+                end
+            end
+        end
+        autoKillLoop=false kStatus.Text="Status: Idle" kStatus.TextColor3=C_DIM kTarget.Text="Target: none"
+    end)
+end
+
+KillBtn.MouseButton1Click:Connect(function()
+    autoKill=not autoKill
+    if autoKill then
+        KillBtn.Text="■  STOP AUTO KILL" KillBtn.TextColor3=C_RED
+        KillBtn.BackgroundColor3=Color3.fromRGB(50,16,16) KillBtnS.Color=C_RED kStroke.Color=C_RED
+        startKill()
+    else
+        KillBtn.Text="▶  START AUTO KILL" KillBtn.TextColor3=C_GREEN
+        KillBtn.BackgroundColor3=Color3.fromRGB(18,50,28) KillBtnS.Color=C_GREEN kStroke.Color=Color3.fromRGB(38,38,52)
+    end
+end)
+
+-- DROPS TAB
+local dCard,dStroke=mkCard(CDrop,4,88)
+mkLbl(dCard,"💰 AUTO CLAIM DROPS",13,Color3.fromRGB(215,215,228),0,8,1,0,Enum.TextXAlignment.Center).Size=UDim2.new(1,0,0,20)
+local dStatus=mkLbl(dCard,"Status: Idle",10,C_DIM,0,30,1,0,Enum.TextXAlignment.Center)
+dStatus.Size=UDim2.new(1,0,0,16) dStatus.Font=Enum.Font.Gotham
+local dCount=mkLbl(dCard,"Claimed: 0",10,Color3.fromRGB(80,80,105),0,48,1,0,Enum.TextXAlignment.Center)
+dCount.Size=UDim2.new(1,0,0,14) dCount.Font=Enum.Font.Gotham
+local dPending=mkLbl(dCard,"Pending: 0",9,Color3.fromRGB(70,70,95),0,64,1,0,Enum.TextXAlignment.Center)
+dPending.Size=UDim2.new(1,0,0,14) dPending.Font=Enum.Font.Gotham
+
+local ClaimBtn,ClaimBtnS=mkBtn(CDrop,100,"▶  START AUTO CLAIM",C_GOLD,Color3.fromRGB(50,35,5))
+
+LootDropped.OnClientEvent:Connect(function(id)
+    if autoClaim and id then
+        task.wait(0.1)
+        pcall(function() LootClaim:FireServer(tostring(id)) end)
+        claimCount+=1 dCount.Text="Claimed: "..claimCount
+    end
+end)
+
+local function startClaim()
+    if autoClaimLoop then return end
+    autoClaimLoop=true
+    task.spawn(function()
+        while autoClaim do
+            -- Claim tracked drops
+            for id in pairs(drops) do
+                pcall(function() LootClaim:FireServer(id) end)
+                claimCount+=1 dCount.Text="Claimed: "..claimCount
+                task.wait(0.1)
+            end
+            -- Scan proximity prompts
+            for _,obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("ProximityPrompt") and obj.ActionText=="Claim" then
+                    pcall(function() fireproximityprompt(obj) end)
+                    task.wait(0.1)
+                end
+            end
+            local p=0 for _ in pairs(drops) do p+=1 end
+            dPending.Text="Pending: "..p
+            dStatus.Text="✅ Watching..." dStatus.TextColor3=C_GREEN
+            task.wait(0.5)
+        end
+        autoClaimLoop=false dStatus.Text="Status: Idle" dStatus.TextColor3=C_DIM
+    end)
+end
+
+ClaimBtn.MouseButton1Click:Connect(function()
+    autoClaim=not autoClaim
+    if autoClaim then
+        ClaimBtn.Text="■  STOP AUTO CLAIM" ClaimBtn.TextColor3=C_RED
+        ClaimBtn.BackgroundColor3=Color3.fromRGB(50,16,16) ClaimBtnS.Color=C_RED dStroke.Color=C_GOLD
+        startClaim()
+    else
+        ClaimBtn.Text="▶  START AUTO CLAIM" ClaimBtn.TextColor3=C_GOLD
+        ClaimBtn.BackgroundColor3=Color3.fromRGB(50,35,5) ClaimBtnS.Color=C_GOLD dStroke.Color=Color3.fromRGB(38,38,52)
+    end
+end)
+
+-- TYCOON TAB
+local tCard,tStroke=mkCard(CTyc,4,88)
+mkLbl(tCard,"🏠 AUTO TYCOON",13,Color3.fromRGB(215,215,228),0,8,1,0,Enum.TextXAlignment.Center).Size=UDim2.new(1,0,0,20)
+local tStatus=mkLbl(tCard,"Status: Idle",10,C_DIM,0,30,1,0,Enum.TextXAlignment.Center)
+tStatus.Size=UDim2.new(1,0,0,16) tStatus.Font=Enum.Font.Gotham
+local tCount=mkLbl(tCard,"Upgrades: 0",10,Color3.fromRGB(80,80,105),0,48,1,0,Enum.TextXAlignment.Center)
+tCount.Size=UDim2.new(1,0,0,14) tCount.Font=Enum.Font.Gotham
+local tRebirth=mkLbl(tCard,"Auto Rebirth: OFF",9,C_DIM,0,64,1,0,Enum.TextXAlignment.Center)
+tRebirth.Size=UDim2.new(1,0,0,14) tRebirth.Font=Enum.Font.Gotham
+
+local UpgradeBtn,UpgradeBtnS=mkBtn(CTyc,100,"▶  START AUTO UPGRADE",C_GREEN,Color3.fromRGB(18,50,28))
+local RebirthBtn,RebirthBtnS=mkBtn(CTyc,142,"▶  AUTO REBIRTH",C_PURPLE,Color3.fromRGB(30,10,50))
+
+local function startUpgrade()
+    if autoUpgradeLoop then return end
+    autoUpgradeLoop=true
+    task.spawn(function()
+        while autoUpgrade do
+            local found=0
+            for _,obj in ipairs(workspace:GetDescendants()) do
+                if not autoUpgrade then break end
+                if obj:IsA("ProximityPrompt") and obj.ObjectText=="Change Tycoon" then
+                    pcall(function() fireproximityprompt(obj) end)
+                    found+=1 upgradeCount+=1
+                    tCount.Text="Upgrades: "..upgradeCount
+                    task.wait(0.2)
+                end
+            end
+            tStatus.Text=(found>0 and "✅ "..found.." upgrades fired" or "⏳ No upgrades found")
+            tStatus.TextColor3=(found>0 and C_GREEN or C_GOLD)
+            task.wait(1)
+        end
+        autoUpgradeLoop=false tStatus.Text="Status: Idle" tStatus.TextColor3=C_DIM
+    end)
+end
+
+UpgradeBtn.MouseButton1Click:Connect(function()
+    autoUpgrade=not autoUpgrade
+    if autoUpgrade then
+        UpgradeBtn.Text="■  STOP AUTO UPGRADE" UpgradeBtn.TextColor3=C_RED
+        UpgradeBtn.BackgroundColor3=Color3.fromRGB(50,16,16) UpgradeBtnS.Color=C_RED tStroke.Color=C_GREEN
+        startUpgrade()
+    else
+        UpgradeBtn.Text="▶  START AUTO UPGRADE" UpgradeBtn.TextColor3=C_GREEN
+        UpgradeBtn.BackgroundColor3=Color3.fromRGB(18,50,28) UpgradeBtnS.Color=C_GREEN tStroke.Color=Color3.fromRGB(38,38,52)
+    end
+end)
+
+RebirthBtn.MouseButton1Click:Connect(function()
+    autoRebirth=not autoRebirth
+    if autoRebirth then
+        RebirthBtn.Text="■  STOP AUTO REBIRTH" RebirthBtn.TextColor3=C_RED
+        RebirthBtn.BackgroundColor3=Color3.fromRGB(50,16,16) RebirthBtnS.Color=C_RED
+        tRebirth.TextColor3=C_PURPLE
+        task.spawn(function()
+            while autoRebirth do
+                pcall(function() RebirthRemote:FireServer() end)
+                tRebirth.Text="Auto Rebirth: ✅ Fired!" tRebirth.TextColor3=C_GREEN
+                task.wait(2)
+                tRebirth.Text="Auto Rebirth: ON" tRebirth.TextColor3=C_PURPLE
+                task.wait(3)
+            end
+            tRebirth.Text="Auto Rebirth: OFF" tRebirth.TextColor3=C_DIM
+        end)
+    else
+        RebirthBtn.Text="▶  AUTO REBIRTH" RebirthBtn.TextColor3=C_PURPLE
+        RebirthBtn.BackgroundColor3=Color3.fromRGB(30,10,50) RebirthBtnS.Color=C_PURPLE
+        tRebirth.Text="Auto Rebirth: OFF" tRebirth.TextColor3=C_DIM
+    end
+end)
+
+-- SHOP TAB
+local autoRoll,autoRollLoop = false,false
+local rollCount = 0
+
+local sCard,sStroke=mkCard(CShop,4,88)
+mkLbl(sCard,"🎰 AUTO ROLL HAKARI",13,Color3.fromRGB(215,215,228),0,8,1,0,Enum.TextXAlignment.Center).Size=UDim2.new(1,0,0,20)
+local sStatus=mkLbl(sCard,"Status: Idle",10,C_DIM,0,30,1,0,Enum.TextXAlignment.Center)
+sStatus.Size=UDim2.new(1,0,0,16) sStatus.Font=Enum.Font.Gotham
+local sCount=mkLbl(sCard,"Rolls: 0",10,Color3.fromRGB(80,80,105),0,48,1,0,Enum.TextXAlignment.Center)
+sCount.Size=UDim2.new(1,0,0,14) sCount.Font=Enum.Font.Gotham
+local sCost=mkLbl(sCard,"Cost: 1 Cursed Finger per roll",9,Color3.fromRGB(70,70,95),0,64,1,0,Enum.TextXAlignment.Center)
+sCost.Size=UDim2.new(1,0,0,14) sCost.Font=Enum.Font.Gotham
+
+local rollIntervalCard,_=mkCard(CShop,100,34)
+mkLbl(rollIntervalCard,"Roll Speed(s):",10,C_DIM,10,0,0.5,0,Enum.TextXAlignment.Left).Size=UDim2.new(0.5,0,1,0)
+local rollSpeedBox=Instance.new("TextBox")
+rollSpeedBox.Size=UDim2.new(0.35,0,0,22) rollSpeedBox.Position=UDim2.new(0.52,0,0.5,-11)
+rollSpeedBox.BackgroundColor3=Color3.fromRGB(22,22,32) rollSpeedBox.Text="0.5"
+rollSpeedBox.TextColor3=C_ORANGE rollSpeedBox.TextSize=11 rollSpeedBox.Font=Enum.Font.GothamBold
+rollSpeedBox.BorderSizePixel=0 rollSpeedBox.ClearTextOnFocus=false rollSpeedBox.Parent=rollIntervalCard
+Instance.new("UICorner",rollSpeedBox).CornerRadius=UDim.new(0,5)
+Instance.new("UIStroke",rollSpeedBox).Color=C_ORANGE
+local ROLL_INTERVAL=0.5
+rollSpeedBox.FocusLost:Connect(function()
+    local v=tonumber(rollSpeedBox.Text)
+    if v and v>0 then ROLL_INTERVAL=v else rollSpeedBox.Text=tostring(ROLL_INTERVAL) end
+end)
+
+local RollBtn,RollBtnS=mkBtn(CShop,142,"▶  START AUTO ROLL",C_ORANGE,Color3.fromRGB(55,25,5))
+
+local infoCard2,_=mkCard(CShop,184,40)
+infoCard2.BackgroundColor3=Color3.fromRGB(14,14,28)
+Instance.new("UIStroke",infoCard2).Color=C_ORANGE
+local infoLbl2=mkLbl(infoCard2,"Merchant tab coming soon!
+Auto buy will be added here.",10,C_ORANGE,0,0,1,0,Enum.TextXAlignment.Center)
+infoLbl2.Size=UDim2.new(1,0,1,0) infoLbl2.TextWrapped=true infoLbl2.Font=Enum.Font.Gotham
+
+local function startRoll()
+    if autoRollLoop then return end
+    autoRollLoop=true
+    task.spawn(function()
+        while autoRoll do
+            -- Find Hakari roll prompt
+            local found=false
+            for _,obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("ProximityPrompt") and obj.ActionText=="Roll" then
+                    pcall(function() fireproximityprompt(obj) end)
+                    found=true
+                    rollCount+=1
+                    sCount.Text="Rolls: "..rollCount
+                    sStatus.Text="🎰 Rolling..." sStatus.TextColor3=C_ORANGE
+                    break
+                end
+            end
+            if not found then
+                sStatus.Text="⏳ Roll prompt not found..." sStatus.TextColor3=C_GOLD
+            end
+            task.wait(ROLL_INTERVAL)
+        end
+        autoRollLoop=false sStatus.Text="Status: Idle" sStatus.TextColor3=C_DIM
+    end)
+end
+
+RollBtn.MouseButton1Click:Connect(function()
+    autoRoll=not autoRoll
+    if autoRoll then
+        RollBtn.Text="■  STOP AUTO ROLL" RollBtn.TextColor3=C_RED
+        RollBtn.BackgroundColor3=Color3.fromRGB(50,16,16) RollBtnS.Color=C_RED sStroke.Color=C_ORANGE
+        startRoll()
+    else
+        RollBtn.Text="▶  START AUTO ROLL" RollBtn.TextColor3=C_ORANGE
+        RollBtn.BackgroundColor3=Color3.fromRGB(55,25,5) RollBtnS.Color=C_ORANGE sStroke.Color=Color3.fromRGB(38,38,52)
+    end
+end)
+
+-- CHAR TAB
+local chars={"Yuji","Megumi","Nobara","Nanami","Todo","Toge","Hanami","Choso","Toji","Jogo","Gojo","Maki","Kashimo","Hakari"}
+local curCharLbl=mkLbl(CChar,"Current: "..CHARACTER,12,C_GOLD,0,8,1,0,Enum.TextXAlignment.Center)
+curCharLbl.Size=UDim2.new(1,0,0,20)
+
+local charBtns={}
+for i,name in ipairs(chars) do
+    local row=math.ceil(i/2) local col=(i-1)%2
+    local btn=Instance.new("TextButton")
+    btn.Size=UDim2.new(0.46,0,0,30) btn.Position=UDim2.new(col*0.5+(col==0 and 0.02 or 0.02),0,0,32+(row-1)*36)
+    btn.BackgroundColor3=name==CHARACTER and Color3.fromRGB(20,35,60) or Color3.fromRGB(22,22,32)
+    btn.Text=name btn.TextColor3=name==CHARACTER and C_BLUE or C_DIM
+    btn.TextSize=11 btn.Font=Enum.Font.GothamBold btn.BorderSizePixel=0 btn.Parent=CChar
+    Instance.new("UICorner",btn).CornerRadius=UDim.new(0,6)
+    local bs=Instance.new("UIStroke",btn)
+    bs.Color=name==CHARACTER and C_BLUE or Color3.fromRGB(40,40,55) bs.Thickness=1
+    charBtns[name]=btn
+    local cap=name
+    btn.MouseButton1Click:Connect(function()
+        CHARACTER=cap curCharLbl.Text="Current: "..cap
+        for n,b in pairs(charBtns) do
+            b.BackgroundColor3=n==cap and Color3.fromRGB(20,35,60) or Color3.fromRGB(22,22,32)
+            b.TextColor3=n==cap and C_BLUE or C_DIM
+            local s=b:FindFirstChildOfClass("UIStroke")
+            if s then s.Color=n==cap and C_BLUE or Color3.fromRGB(40,40,55) end
+        end
+    end)
+end
+
+print("[Sorcerer Hub] Loaded! v2")
