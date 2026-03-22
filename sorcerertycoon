@@ -12,7 +12,7 @@ local RebirthRemote = Remotes.Tycoon:WaitForChild("Rebirth")
 
 local CHARACTER = "Yuji"
 local ATTACK_INTERVAL = 0.1
-local KILL_RADIUS = 50
+local KILL_RADIUS = 200
 local ROLL_INTERVAL = 0.5
 
 local autoKill, autoKillLoop = false, false
@@ -262,24 +262,18 @@ local kStatus = mkLbl(kCard,"Status: Idle",10,C_DIM,0,30,1,0,Enum.TextXAlignment
 kStatus.Size = UDim2.new(1,0,0,16) kStatus.Font = Enum.Font.Gotham
 local kCount = mkLbl(kCard,"Hits: 0",10,Color3.fromRGB(80,80,105),0,48,1,0,Enum.TextXAlignment.Center)
 kCount.Size = UDim2.new(1,0,0,14) kCount.Font = Enum.Font.Gotham
-local kInfo = mkLbl(kCard,"Attacks all enemies in radius",9,Color3.fromRGB(70,70,95),0,64,1,0,Enum.TextXAlignment.Center)
+local kInfo = mkLbl(kCard,"Attacks enemies in radius",9,Color3.fromRGB(70,70,95),0,64,1,0,Enum.TextXAlignment.Center)
 kInfo.Size = UDim2.new(1,0,0,14) kInfo.Font = Enum.Font.Gotham
-local kRadius = mkLbl(kCard,"Radius: 50",9,Color3.fromRGB(70,70,95),0,80,1,0,Enum.TextXAlignment.Center)
-kRadius.Size = UDim2.new(1,0,0,14) kRadius.Font = Enum.Font.Gotham
+local kRadLbl = mkLbl(kCard,"Radius: 200",9,Color3.fromRGB(70,70,95),0,80,1,0,Enum.TextXAlignment.Center)
+kRadLbl.Size = UDim2.new(1,0,0,14) kRadLbl.Font = Enum.Font.Gotham
 
 local spdCard, _ = mkCard(CKill, 112, 34)
-mkLbl(spdCard,"Speed(s):",10,C_DIM,10,0,0.3,0,Enum.TextXAlignment.Left).Size=UDim2.new(0.3,0,1,0)
+mkLbl(spdCard,"Speed:",10,C_DIM,8,0,0.22,34,Enum.TextXAlignment.Left)
 local spdBox = Instance.new("TextBox")
-spdBox.Size = UDim2.new(0.25,0,0,22)
-spdBox.Position = UDim2.new(0.32,0,0.5,-11)
-spdBox.BackgroundColor3 = Color3.fromRGB(22,22,32)
-spdBox.Text = "0.1"
-spdBox.TextColor3 = C_RED
-spdBox.TextSize = 11
-spdBox.Font = Enum.Font.GothamBold
-spdBox.BorderSizePixel = 0
-spdBox.ClearTextOnFocus = false
-spdBox.Parent = spdCard
+spdBox.Size = UDim2.new(0.22,0,0,22) spdBox.Position = UDim2.new(0.23,0,0.5,-11)
+spdBox.BackgroundColor3 = Color3.fromRGB(22,22,32) spdBox.Text = "0.1"
+spdBox.TextColor3 = C_RED spdBox.TextSize = 11 spdBox.Font = Enum.Font.GothamBold
+spdBox.BorderSizePixel = 0 spdBox.ClearTextOnFocus = false spdBox.Parent = spdCard
 Instance.new("UICorner", spdBox).CornerRadius = UDim.new(0,5)
 Instance.new("UIStroke", spdBox).Color = C_RED
 spdBox.FocusLost:Connect(function()
@@ -287,30 +281,19 @@ spdBox.FocusLost:Connect(function()
     if v and v > 0 then ATTACK_INTERVAL = v else spdBox.Text = tostring(ATTACK_INTERVAL) end
 end)
 
-mkLbl(spdCard,"Radius:",10,C_DIM,0,0,0,0,Enum.TextXAlignment.Left).Size=UDim2.new(0.13,0,1,0)
-local mkL2 = Instance.new("TextLabel")
-mkL2.Size = UDim2.new(0.13,0,1,0) mkL2.Position = UDim2.new(0.59,0,0,0)
-mkL2.BackgroundTransparency=1 mkL2.Text="Radius:" mkL2.TextSize=10
-mkL2.TextColor3=C_DIM mkL2.Font=Enum.Font.GothamBold mkL2.Parent=spdCard
-
+mkLbl(spdCard,"Radius:",10,C_DIM,0,0,0,34,Enum.TextXAlignment.Left).Position = UDim2.new(0.5,4,0,0)
 local radBox = Instance.new("TextBox")
-radBox.Size = UDim2.new(0.22,0,0,22)
-radBox.Position = UDim2.new(0.76,0,0.5,-11)
-radBox.BackgroundColor3 = Color3.fromRGB(22,22,32)
-radBox.Text = "50"
-radBox.TextColor3 = C_RED
-radBox.TextSize = 11
-radBox.Font = Enum.Font.GothamBold
-radBox.BorderSizePixel = 0
-radBox.ClearTextOnFocus = false
-radBox.Parent = spdCard
+radBox.Size = UDim2.new(0.22,0,0,22) radBox.Position = UDim2.new(0.73,0,0.5,-11)
+radBox.BackgroundColor3 = Color3.fromRGB(22,22,32) radBox.Text = "200"
+radBox.TextColor3 = C_RED radBox.TextSize = 11 radBox.Font = Enum.Font.GothamBold
+radBox.BorderSizePixel = 0 radBox.ClearTextOnFocus = false radBox.Parent = spdCard
 Instance.new("UICorner", radBox).CornerRadius = UDim.new(0,5)
 Instance.new("UIStroke", radBox).Color = C_RED
 radBox.FocusLost:Connect(function()
     local v = tonumber(radBox.Text)
     if v and v > 0 then
         KILL_RADIUS = v
-        kRadius.Text = "Radius: "..v
+        kRadLbl.Text = "Radius: "..v
     else
         radBox.Text = tostring(KILL_RADIUS)
     end
@@ -318,14 +301,18 @@ end)
 
 local KillBtn, KillBtnS = mkBtn(CKill, 154, "▶  START KILL AURA", C_GREEN, Color3.fromRGB(18,50,28))
 
+-- Enemies are in Workspace.Map.Boss and Workspace.Map.NPCs
 local function getNearbyEnemies()
     local char = LP.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then return {} end
     local e = {}
-    for _, obj in ipairs(workspace:GetChildren()) do
+    -- Search deep using GetDescendants on Map folder
+    local map = workspace:FindFirstChild("Map")
+    if not map then return {} end
+    for _, obj in ipairs(map:GetDescendants()) do
         local hum = obj:FindFirstChildOfClass("Humanoid")
-        if hum and hum.Health > 0 then
+        if hum and hum.Health > 100 then -- skip HP=100 shop NPCs
             local isP = false
             for _, p in ipairs(Players:GetPlayers()) do
                 if p.Character == obj then isP = true break end
@@ -354,7 +341,7 @@ local function startKill()
                 kStatus.Text = "⏳ No enemies nearby..."
                 kStatus.TextColor3 = C_GOLD
             else
-                kStatus.Text = "⚔ Attacking "..#enemies.." enemies"
+                kStatus.Text = "⚔ Hitting "..#enemies.." enemies"
                 kStatus.TextColor3 = C_RED
                 for _, enemy in ipairs(enemies) do
                     if not autoKill then break end
@@ -367,6 +354,7 @@ local function startKill()
                     end)
                     killCount += 1
                     kCount.Text = "Hits: "..killCount
+                    task.wait(0.05)
                 end
             end
             task.wait(ATTACK_INTERVAL)
@@ -483,20 +471,22 @@ local function startUpgrade()
     task.spawn(function()
         while autoUpgrade do
             local found = 0
-            for _, obj in ipairs(workspace:GetDescendants()) do
+            -- Search specifically in Tycoons folder
+            local tycoons = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Tycoons")
+            local searchRoot = tycoons or workspace
+            for _, obj in ipairs(searchRoot:GetDescendants()) do
                 if not autoUpgrade then break end
-                -- FIX: ActionText is "Reset", ObjectText is "Change Tycoon"
                 if obj:IsA("ProximityPrompt") and obj.ActionText == "Reset" and obj.ObjectText == "Change Tycoon" then
                     pcall(function() fireproximityprompt(obj) end)
                     found += 1
                     upgradeCount += 1
                     tCount.Text = "Upgrades: "..upgradeCount
-                    task.wait(0.2)
+                    task.wait(0.5) -- more time between fires
                 end
             end
             tStatus.Text = found > 0 and "✅ "..found.." upgrades fired" or "⏳ No upgrades found"
             tStatus.TextColor3 = found > 0 and C_GREEN or C_GOLD
-            task.wait(1)
+            task.wait(2)
         end
         autoUpgradeLoop = false
         tStatus.Text = "Status: Idle"
@@ -565,16 +555,10 @@ sCost.Size = UDim2.new(1,0,0,14) sCost.Font = Enum.Font.Gotham
 local rollCard, _ = mkCard(CShop, 100, 34)
 mkLbl(rollCard,"Roll Speed(s):",10,C_DIM,10,0,0.5,0,Enum.TextXAlignment.Left).Size=UDim2.new(0.5,0,1,0)
 local rollBox = Instance.new("TextBox")
-rollBox.Size = UDim2.new(0.35,0,0,22)
-rollBox.Position = UDim2.new(0.52,0,0.5,-11)
-rollBox.BackgroundColor3 = Color3.fromRGB(22,22,32)
-rollBox.Text = "0.5"
-rollBox.TextColor3 = C_ORANGE
-rollBox.TextSize = 11
-rollBox.Font = Enum.Font.GothamBold
-rollBox.BorderSizePixel = 0
-rollBox.ClearTextOnFocus = false
-rollBox.Parent = rollCard
+rollBox.Size = UDim2.new(0.35,0,0,22) rollBox.Position = UDim2.new(0.52,0,0.5,-11)
+rollBox.BackgroundColor3 = Color3.fromRGB(22,22,32) rollBox.Text = "0.5"
+rollBox.TextColor3 = C_ORANGE rollBox.TextSize = 11 rollBox.Font = Enum.Font.GothamBold
+rollBox.BorderSizePixel = 0 rollBox.ClearTextOnFocus = false rollBox.Parent = rollCard
 Instance.new("UICorner", rollBox).CornerRadius = UDim.new(0,5)
 Instance.new("UIStroke", rollBox).Color = C_ORANGE
 rollBox.FocusLost:Connect(function()
@@ -588,9 +572,7 @@ local infoCard, _ = mkCard(CShop, 184, 40)
 infoCard.BackgroundColor3 = Color3.fromRGB(14,14,28)
 Instance.new("UIStroke", infoCard).Color = C_ORANGE
 local infoLbl = mkLbl(infoCard,"Merchant coming soon! Auto buy will be added here.",10,C_ORANGE,0,0,1,0,Enum.TextXAlignment.Center)
-infoLbl.Size = UDim2.new(1,0,1,0)
-infoLbl.TextWrapped = true
-infoLbl.Font = Enum.Font.Gotham
+infoLbl.Size = UDim2.new(1,0,1,0) infoLbl.TextWrapped = true infoLbl.Font = Enum.Font.Gotham
 
 local function startRoll()
     if autoRollLoop then return end
@@ -599,7 +581,6 @@ local function startRoll()
         while autoRoll do
             local found = false
             for _, obj in ipairs(workspace:GetDescendants()) do
-                -- FIX: ActionText starts with "Roll"
                 if obj:IsA("ProximityPrompt") and obj.ActionText:sub(1,4) == "Roll" then
                     pcall(function() fireproximityprompt(obj) end)
                     found = true
@@ -677,4 +658,4 @@ for i, name in ipairs(chars) do
     end)
 end
 
-print("[Sorcerer Hub] Loaded! v4")
+print("[Sorcerer Hub] Loaded! v5")
