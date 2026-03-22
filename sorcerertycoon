@@ -12,6 +12,7 @@ local RebirthRemote = Remotes.Tycoon:WaitForChild("Rebirth")
 
 local CHARACTER = "Yuji"
 local ATTACK_INTERVAL = 0.1
+local KILL_RADIUS = 50
 local ROLL_INTERVAL = 0.5
 
 local autoKill, autoKillLoop = false, false
@@ -254,21 +255,23 @@ TabShop.MouseButton1Click:Connect(function() setTab("shop") end)
 TabChar.MouseButton1Click:Connect(function() setTab("char") end)
 setTab("kill")
 
--- ========== KILL TAB ==========
-local kCard, kStroke = mkCard(CKill, 4, 88)
-mkLbl(kCard,"⚔ AUTO KILL",13,Color3.fromRGB(215,215,228),0,8,1,0,Enum.TextXAlignment.Center).Size=UDim2.new(1,0,0,20)
+-- ========== KILL TAB (KILL AURA) ==========
+local kCard, kStroke = mkCard(CKill, 4, 100)
+mkLbl(kCard,"⚔ KILL AURA",13,Color3.fromRGB(215,215,228),0,8,1,0,Enum.TextXAlignment.Center).Size=UDim2.new(1,0,0,20)
 local kStatus = mkLbl(kCard,"Status: Idle",10,C_DIM,0,30,1,0,Enum.TextXAlignment.Center)
 kStatus.Size = UDim2.new(1,0,0,16) kStatus.Font = Enum.Font.Gotham
 local kCount = mkLbl(kCard,"Hits: 0",10,Color3.fromRGB(80,80,105),0,48,1,0,Enum.TextXAlignment.Center)
 kCount.Size = UDim2.new(1,0,0,14) kCount.Font = Enum.Font.Gotham
-local kTarget = mkLbl(kCard,"Target: none",9,Color3.fromRGB(70,70,95),0,64,1,0,Enum.TextXAlignment.Center)
-kTarget.Size = UDim2.new(1,0,0,14) kTarget.Font = Enum.Font.Gotham
+local kInfo = mkLbl(kCard,"Attacks all enemies in radius",9,Color3.fromRGB(70,70,95),0,64,1,0,Enum.TextXAlignment.Center)
+kInfo.Size = UDim2.new(1,0,0,14) kInfo.Font = Enum.Font.Gotham
+local kRadius = mkLbl(kCard,"Radius: 50",9,Color3.fromRGB(70,70,95),0,80,1,0,Enum.TextXAlignment.Center)
+kRadius.Size = UDim2.new(1,0,0,14) kRadius.Font = Enum.Font.Gotham
 
-local spdCard, _ = mkCard(CKill, 100, 34)
-mkLbl(spdCard,"Speed(s):",10,C_DIM,10,0,0.45,0,Enum.TextXAlignment.Left).Size=UDim2.new(0.45,0,1,0)
+local spdCard, _ = mkCard(CKill, 112, 34)
+mkLbl(spdCard,"Speed(s):",10,C_DIM,10,0,0.3,0,Enum.TextXAlignment.Left).Size=UDim2.new(0.3,0,1,0)
 local spdBox = Instance.new("TextBox")
-spdBox.Size = UDim2.new(0.4,0,0,22)
-spdBox.Position = UDim2.new(0.48,0,0.5,-11)
+spdBox.Size = UDim2.new(0.25,0,0,22)
+spdBox.Position = UDim2.new(0.32,0,0.5,-11)
 spdBox.BackgroundColor3 = Color3.fromRGB(22,22,32)
 spdBox.Text = "0.1"
 spdBox.TextColor3 = C_RED
@@ -284,18 +287,58 @@ spdBox.FocusLost:Connect(function()
     if v and v > 0 then ATTACK_INTERVAL = v else spdBox.Text = tostring(ATTACK_INTERVAL) end
 end)
 
-local KillBtn, KillBtnS = mkBtn(CKill, 142, "▶  START AUTO KILL", C_GREEN, Color3.fromRGB(18,50,28))
+mkLbl(spdCard,"Radius:",10,C_DIM,0,0,0,0,Enum.TextXAlignment.Left).Size=UDim2.new(0.13,0,1,0)
+local mkL2 = Instance.new("TextLabel")
+mkL2.Size = UDim2.new(0.13,0,1,0) mkL2.Position = UDim2.new(0.59,0,0,0)
+mkL2.BackgroundTransparency=1 mkL2.Text="Radius:" mkL2.TextSize=10
+mkL2.TextColor3=C_DIM mkL2.Font=Enum.Font.GothamBold mkL2.Parent=spdCard
 
-local function getEnemies()
+local radBox = Instance.new("TextBox")
+radBox.Size = UDim2.new(0.22,0,0,22)
+radBox.Position = UDim2.new(0.76,0,0.5,-11)
+radBox.BackgroundColor3 = Color3.fromRGB(22,22,32)
+radBox.Text = "50"
+radBox.TextColor3 = C_RED
+radBox.TextSize = 11
+radBox.Font = Enum.Font.GothamBold
+radBox.BorderSizePixel = 0
+radBox.ClearTextOnFocus = false
+radBox.Parent = spdCard
+Instance.new("UICorner", radBox).CornerRadius = UDim.new(0,5)
+Instance.new("UIStroke", radBox).Color = C_RED
+radBox.FocusLost:Connect(function()
+    local v = tonumber(radBox.Text)
+    if v and v > 0 then
+        KILL_RADIUS = v
+        kRadius.Text = "Radius: "..v
+    else
+        radBox.Text = tostring(KILL_RADIUS)
+    end
+end)
+
+local KillBtn, KillBtnS = mkBtn(CKill, 154, "▶  START KILL AURA", C_GREEN, Color3.fromRGB(18,50,28))
+
+local function getNearbyEnemies()
+    local char = LP.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return {} end
     local e = {}
-    for _, obj in ipairs(workspace:GetDescendants()) do
+    for _, obj in ipairs(workspace:GetChildren()) do
         local hum = obj:FindFirstChildOfClass("Humanoid")
         if hum and hum.Health > 0 then
             local isP = false
             for _, p in ipairs(Players:GetPlayers()) do
                 if p.Character == obj then isP = true break end
             end
-            if not isP then table.insert(e, obj) end
+            if not isP then
+                local enemyHRP = obj:FindFirstChild("HumanoidRootPart")
+                if enemyHRP then
+                    local dist = (hrp.Position - enemyHRP.Position).Magnitude
+                    if dist <= KILL_RADIUS then
+                        table.insert(e, obj)
+                    end
+                end
+            end
         end
     end
     return e
@@ -306,19 +349,17 @@ local function startKill()
     autoKillLoop = true
     task.spawn(function()
         while autoKill do
-            local enemies = getEnemies()
+            local enemies = getNearbyEnemies()
             if #enemies == 0 then
-                kStatus.Text = "⏳ No enemies..."
+                kStatus.Text = "⏳ No enemies nearby..."
                 kStatus.TextColor3 = C_GOLD
-                task.wait(1)
             else
+                kStatus.Text = "⚔ Attacking "..#enemies.." enemies"
+                kStatus.TextColor3 = C_RED
                 for _, enemy in ipairs(enemies) do
                     if not autoKill then break end
                     local hum = enemy:FindFirstChildOfClass("Humanoid")
                     if not hum or hum.Health <= 0 then continue end
-                    kTarget.Text = "Target: "..enemy.Name
-                    kStatus.Text = "⚔ Attacking..."
-                    kStatus.TextColor3 = C_RED
                     pcall(function() SKill:FireServer(CHARACTER, "M1_1") end)
                     pcall(function()
                         local id = tostring(math.random(100000,999999)).."_hit1"
@@ -326,28 +367,27 @@ local function startKill()
                     end)
                     killCount += 1
                     kCount.Text = "Hits: "..killCount
-                    task.wait(ATTACK_INTERVAL)
                 end
             end
+            task.wait(ATTACK_INTERVAL)
         end
         autoKillLoop = false
         kStatus.Text = "Status: Idle"
         kStatus.TextColor3 = C_DIM
-        kTarget.Text = "Target: none"
     end)
 end
 
 KillBtn.MouseButton1Click:Connect(function()
     autoKill = not autoKill
     if autoKill then
-        KillBtn.Text = "■  STOP AUTO KILL"
+        KillBtn.Text = "■  STOP KILL AURA"
         KillBtn.TextColor3 = C_RED
         KillBtn.BackgroundColor3 = Color3.fromRGB(50,16,16)
         KillBtnS.Color = C_RED
         kStroke.Color = C_RED
         startKill()
     else
-        KillBtn.Text = "▶  START AUTO KILL"
+        KillBtn.Text = "▶  START KILL AURA"
         KillBtn.TextColor3 = C_GREEN
         KillBtn.BackgroundColor3 = Color3.fromRGB(18,50,28)
         KillBtnS.Color = C_GREEN
@@ -445,7 +485,8 @@ local function startUpgrade()
             local found = 0
             for _, obj in ipairs(workspace:GetDescendants()) do
                 if not autoUpgrade then break end
-                if obj:IsA("ProximityPrompt") and obj.ObjectText == "Change Tycoon" then
+                -- FIX: ActionText is "Reset", ObjectText is "Change Tycoon"
+                if obj:IsA("ProximityPrompt") and obj.ActionText == "Reset" and obj.ObjectText == "Change Tycoon" then
                     pcall(function() fireproximityprompt(obj) end)
                     found += 1
                     upgradeCount += 1
@@ -558,7 +599,8 @@ local function startRoll()
         while autoRoll do
             local found = false
             for _, obj in ipairs(workspace:GetDescendants()) do
-                if obj:IsA("ProximityPrompt") and obj.ActionText == "Roll" then
+                -- FIX: ActionText starts with "Roll"
+                if obj:IsA("ProximityPrompt") and obj.ActionText:sub(1,4) == "Roll" then
                     pcall(function() fireproximityprompt(obj) end)
                     found = true
                     rollCount += 1
@@ -635,4 +677,4 @@ for i, name in ipairs(chars) do
     end)
 end
 
-print("[Sorcerer Hub] Loaded! v3")
+print("[Sorcerer Hub] Loaded! v4")
